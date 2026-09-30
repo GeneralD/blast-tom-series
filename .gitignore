@@ -1,0 +1,16 @@
+.DS_Store
+*.swp
+*~
+
+# CAD の中間ファイル
+*.stl
+*.3mf
+
+# CAD の生成物。再実行すれば必ず同じ物が出るので追跡しない。
+# 実際に工場へ送った版だけ cad/release/ に手で置いて追跡する。
+cad/out/
+
+# uv が作る仮想環境（uv.lock は追跡する）
+.venv/
+__pycache__/
+*.pyc
