@@ -108,12 +108,29 @@ Leaf = Dim | Choice
 _SET_PATH = "{}"
 
 
+def _key_repr(key: Any, prefix: str) -> str:
+    """dict のキーをパスに書く形。`override` が `ast.literal_eval` で読み戻せないキーは止める。
+
+    Enum のように repr がリテラルでないキーを黙って通すと、`walk` の出したパスを
+    `override` に渡した瞬間に「書式が読めない」で落ち、その値を sweep できない。
+    """
+    text = repr(key)
+    try:
+        ok = ast.literal_eval(text) == key
+    except (ValueError, SyntaxError):
+        ok = False
+    if not ok:
+        raise TypeError(f"{prefix or '(root)'}[{text}]: dict のキーは repr がリテラルに戻る型"
+                        f"（str・int・float・tuple など）に限る。override がパスを読み戻せない")
+    return text
+
+
 def walk(obj: Any, prefix: str = "") -> Iterator[tuple[str, Leaf]]:
     """dataclass を再帰的に辿って、含まれる `Dim` と `Choice` を全部拾う。
 
     **タプル／リスト／dict／set の中まで降りる。** 降りないと、断面の点列のような
     「コンテナに入った寸法」が出典検査を素通りする。パスは添字が `[i]`、dict が
-    `["key"]`（キーは `repr` で書くので `'1'` と `1` は別物）、set / frozenset が `{}`。
+    `["key"]`（キーは `repr` で書くので `'1'` と `1` は別物。repr がリテラルに戻らないキーは `TypeError`）、set / frozenset が `{}`。
     set は順序が無いので要素を `repr` の順で辿り、どの要素も同じ `{}` のパスになる —
     パスで 1 つを指せないので `override` の対象外（`TypeError`）。
 
@@ -130,7 +147,7 @@ def walk(obj: Any, prefix: str = "") -> Iterator[tuple[str, Leaf]]:
         return
     if isinstance(obj, Mapping):
         for key, item in obj.items():
-            yield from walk(item, f"{prefix}[{key!r}]")
+            yield from walk(item, f"{prefix}[{_key_repr(key, prefix)}]")
         return
     if isinstance(obj, (set, frozenset)):
         for item in sorted(obj, key=repr):

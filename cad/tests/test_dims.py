@@ -415,3 +415,13 @@ def test_override_round_trips_every_path_walk_emits_except_set_paths(root):
         got = dict(walk(t))[path]
         assert (got.value if isinstance(got, Choice) else float(got)) == new, path
         assert (got.source, got.note) == (leaf.source, leaf.note), path
+
+
+def test_walk_rejects_a_dict_key_whose_repr_cannot_be_read_back_by_override():
+    @dataclass(frozen=True)
+    class _H:
+        d: dict
+
+    # Enum の repr（<Source.DESIGN: ...>）はリテラルでないので、パスにすると override が読めない
+    with pytest.raises(TypeError, match=r"d\[.*repr"):
+        list(walk(_H({Source.DESIGN: design(1)})))
