@@ -16,7 +16,7 @@ from drumcad.stock import nearest
 from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_rod, lookup_screw
 from .derived import derive
 from .params import GatlingSpec
-from .placement import (cradle_y_rear, flange_bolt_points, grip_y, levels, lug_angles, lug_box, radii,
+from .placement import (cradle_corner, cradle_y_rear, flange_bolt_points, grip_y, levels, lug_angles, lug_box, radii,
                         tube_points)
 
 EPS = 1e-6                    # 縁ちょうどの値が浮動小数の誤差で fatal にならないように
@@ -184,19 +184,29 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
             found.append(Issue(True, f"当て板が{name}に食い込む（平面視で内縁 {_origin_distance(pad):.2f} < 外半径 {radius:.2f}、z も重なる）"))
     box, rod_r = lug_box(spec), float(lookup_rod(spec.lug.thread)) / 2
     lug_z, rod_z = (z.lug_bottom, z.lug_top), (z.lug_bottom, z.lug_bottom + float(spec.lug.rod_length))
+    # クレードル: フレームの内面（正方形の半幅 frame_inner）、腕（対角線上、胴バンドの外面から隅まで、幅 = 平角材の幅）。
+    # 脚はフレームの内面より外、フレームの下にあり、ラグの上端はフレームより上なので、脚に届くラグはフレームの z にも
+    # かかって内面の外に出る（フレームの検査で止まる）。
+    c = spec.cradle
+    t, w = float(c.bar.thickness), float(c.bar.width)
+    zb = (z.band_bottom + z.band_top) / 2
+    arms = [_rect(r.band_outer, cradle_corner(spec), -w / 2, w / 2, a) for a in (45, 135, 225, 315)]
     hits: dict[str, list[float]] = {}
     for a in lug_angles(spec):
         lug = _rect(*box, a)
+        out_of_frame = max(max(abs(x), abs(y)) for x, y in lug) > r.frame_inner + EPS
         rod = (r.rod * math.cos(math.radians(a)), r.rod * math.sin(math.radians(a)))
         for what, hit in (
-            ("ラグがホルダー受け", _z_overlap(*lug_z, *holder_z) and _circle_overlaps((0.0, y0), rb, lug)),
-            ("ラグが当て板", _z_overlap(*lug_z, *pad_z) and _polygons_overlap(lug, pad)),
-            ("ロッドがホルダー受け", _z_overlap(*rod_z, *holder_z) and math.dist(rod, (0.0, y0)) < rb + rod_r - EPS),
-            ("ロッドが当て板", _z_overlap(*rod_z, *pad_z) and _circle_overlaps(rod, rod_r, pad)),
+            ("ラグがホルダー受けに当たる", _z_overlap(*lug_z, *holder_z) and _circle_overlaps((0.0, y0), rb, lug)),
+            ("ラグが当て板に当たる", _z_overlap(*lug_z, *pad_z) and _polygons_overlap(lug, pad)),
+            ("ロッドがホルダー受けに当たる", _z_overlap(*rod_z, *holder_z) and math.dist(rod, (0.0, y0)) < rb + rod_r - EPS),
+            ("ロッドが当て板に当たる", _z_overlap(*rod_z, *pad_z) and _circle_overlaps(rod, rod_r, pad)),
+            ("ラグがクレードルのフレームの内面から外に出て当たる", _z_overlap(*lug_z, z.frame_centre - t / 2, z.frame_top) and out_of_frame),
+            ("ラグがクレードルの腕に当たる", _z_overlap(*lug_z, zb - t / 2, zb + t / 2) and any(_polygons_overlap(lug, arm) for arm in arms)),
         ):
             if hit:
                 hits.setdefault(what, []).append(a)
-    found += [Issue(True, f"{what}に当たる（方位 {', '.join(f'{a:g}°' for a in angles)}）") for what, angles in hits.items()]
+    found += [Issue(True, f"{what}（方位 {', '.join(f'{a:g}°' for a in angles)}）") for what, angles in hits.items()]
     # グリップ（YZ 面の円）と、当て板・ホルダー受け（YZ 面の矩形）。グリップは X 方向にフレームの幅いっぱい通る
     grip = (grip_y(spec), z.frame_centre)
     grip_r = float(spec.cradle.grip_dia) / 2

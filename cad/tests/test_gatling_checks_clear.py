@@ -52,3 +52,19 @@ def test_a_grip_too_close_to_the_frame_runs_into_the_pad_and_the_holder():
     assert any("グリップ" in w and "当て板" in w for w in found) and any("グリップ" in w and "ホルダー受け" in w for w in found), found
     assert any("グリップ" in w for w in _fatal(override(SPEC, cradle__handle_length=31.1)))
     assert _fatal(override(SPEC, cradle__handle_length=31.2)) == []
+
+
+def test_a_lug_that_reaches_down_to_the_frame_and_sticks_out_of_it_is_fatal():
+    """ラグ高さ 60（下端 44.19）でフレーム（z 54〜60）と z が重なる。0° のラグの外の隅 (92, ±8) がフレーム内面 83 + 逃げ の外に出ると当たる。"""
+    tall = {"lug.height": 60, "lug.rod_length": 120}
+    assert any("ラグ" in w and "フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=8, **tall)))
+    assert any("ラグ" in w and "フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=8.9, **tall)))
+    assert not any("フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=9, **tall)))     # 隅がちょうど内面に接する
+
+
+def test_a_lug_on_the_diagonal_that_reaches_down_to_an_arm_is_fatal():
+    """腕はフレームの内側（対角線上、胴バンドの外面から隅まで）にある。フレームの平角材を厚くすると腕が胴バンドの上端より上に出て、
+    45° のラグ（ラグ 8 個）の下端に届く。脚はフレームの内面より外にあるので、脚に届くラグはフレームの検査で先に止まる。"""
+    values = {"lug.count": 8, "hoop.ear.count": 8, "cradle.bar.thickness": 40, "lug.height": 60, "lug.rod_length": 120}
+    assert any("ラグ" in w and "腕" in w for w in _fatal(override(SPEC, **values)))
+    assert not any("腕" in w for w in _fatal(override(SPEC, **{**values, "lug.height": 52})))     # 下端 52.19 > 腕の上端 51.5
