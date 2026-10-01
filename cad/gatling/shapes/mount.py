@@ -29,7 +29,7 @@ def band(spec: GatlingSpec) -> cq.Workplane:
     tab, thick = band_tab_length(spec), float(spec.band.bar.thickness)
     half_gap = float(spec.band.gap) / 2
     screw = lookup_screw(spec.band.bolt)
-    zc = (z.band_bottom + z.band_top) / 2
+    zc = z.band_centre
     halves = []
     for sign in (1, -1):
         half_box = cq.Workplane("XY").box(2 * r.band_outer, r.band_outer - half_gap, height, centered=(True, False, False))
@@ -65,7 +65,7 @@ def cradle(spec: GatlingSpec) -> cq.Workplane:
     z, r, c = levels(spec), radii(spec), spec.cradle
     w, t, a = float(c.bar.width), float(c.bar.thickness), r.frame_inner
     outer, zf = a + w, z.frame_centre
-    zb = (z.band_bottom + z.band_top) / 2
+    zb = z.band_centre
     gy = grip_y(spec)
 
     def box(sx: float, sy: float, sz: float, at: tuple[float, float, float]) -> cq.Workplane:

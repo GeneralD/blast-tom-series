@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import pytest
-from gatling.checks import mount_clear
+from gatling.interference import mount_clear
 from gatling.params import SPEC, override
 
 

@@ -68,6 +68,7 @@ class Levels:
     lug_bottom: float
     band_bottom: float
     band_top: float
+    band_centre: float        # 胴バンドの高さの中心（耳のボルト、クレードルの脚の下端と腕の厚みの中心）
     frame_centre: float       # クレードルの水平フレームの厚みの中心
     frame_top: float          # フレームの上面（= 当て板の下面）
     pad_top: float            # 当て板の上面（= ホルダー受けの下面）
@@ -101,6 +102,7 @@ def levels(spec: GatlingSpec) -> Levels:
         tip_top=tip_bottom + float(c.tip_thickness), tip_bottom=tip_bottom, tube_tip=-length,
         hoop_bottom=hoop_bottom, lug_top=lug_top, lug_bottom=lug_top - float(spec.lug.height),
         band_bottom=band_bottom, band_top=band_bottom + float(spec.band.bar.width),
+        band_centre=band_bottom + float(spec.band.bar.width) / 2,
         frame_centre=frame_centre, frame_top=frame_top, pad_top=pad_top,
         holder_bottom=pad_top, holder_top=pad_top + float(spec.mount.body_height),
     )
