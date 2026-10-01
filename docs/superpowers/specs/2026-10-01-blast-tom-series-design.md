@@ -63,6 +63,7 @@ Vulcan / Magnum は共通基盤の契約（§4.4）に従って後日それぞ�
 | D-15 | **仕上げは #400 サテン。管は研磨済みの市販パイプ（手すり用 #400 研磨管）を使い、溶接は見えない面から、溶接後は局所の酸洗いペースト＋手仕上げ** | 組立後は管の隙間に研磨機が入らない。曲げ・溶接した部品を鏡面にするのは現実的でない |
 | D-16 | **ヘッダープレートは 6 mm。管は下から挿してプレナム側（上面）から溶接。フランジ合わせ面は溶接後に平面出し（平面度 0.3）、1 mm シリコーンガスケット** | 3 mm 板に管 6 本の全周溶接では皿状に歪み、気密面にならない |
 | D-17 | **ヘッダープレートと胴底フランジは胴より大径（外径 ≈ 胴外径 + 40 mm）。ボルト円は胴の外側、方位は管に対して 30° ずらす** | 胴と同径では M6 穴の肉が無く、内向きフランジは管の開口を塞ぐ。大径にすると工具も外から届き、ミニガンの「筐体の段」にもなる |
+| D-18 | **`assembly()` は員数ぶんの solid をすべて組立座標系に置く。BOM の質量は solid 1 個分、合計は × 員数。solid 数と `PartInfo.count` が違えば fatal。製作品の BOM 行の規格・寸法は `PartInfo` に機種が書く** | 形状・質量・員数が別々に書かれると、組立の出力と BOM が黙って食い違う。数の一致を契約にして build が止める |
 
 ## 3. リポ構成
 
@@ -113,11 +114,11 @@ blast-tom-series/
 
 | モジュール | そのまま使う | インターフェースを新設する |
 |---|---|---|
-| `dims.py` | `Dim(float)` に出典 `Source` を持たせる仕組み。`measured / spec / design / derived / provisional`、`walk()` `unsettled()` `as_provisional()` | `Source` のラベルを本リポの意味に書き換える（`spec` = メーカー仕様書・カタログ値。証言系の出典は削除）。docstring から元の用途の語を除く。**文字列の選択肢を持つ葉 `Choice(value, source)`** を追加し、`walk()` が拾うようにする（型番・ねじ規格・仕上げ・`tuning_target` が出典と未決判定を持てるように） |
+| `dims.py` | `Dim(float)` に出典 `Source` を持たせる仕組み。`measured / spec / design / derived / provisional`、`walk()` `unsettled()` `as_provisional()` | `Source` のラベルを本リポの意味に書き換える（`spec` = メーカー仕様書・カタログ値。証言系の出典は削除）。docstring から元の用途の語を除く。**文字列の選択肢を持つ葉 `Choice(value, source)`** を追加し、`walk()` が拾うようにする（型番・ねじ規格・仕上げ・`tuning_target` が出典と未決判定を持てるように）。`walk()` は dataclass に加え tuple / list / dict / set の中まで降りる（`as_provisional` は同じ型で写し、`init=False` のフィールドに葉があれば `TypeError`） |
 | `checks.py`（新規） | — | `Issue(fatal: bool, what: str)`。**fatal が 0 件なら出力可。警告は表示して続行** |
 | `drawing/` | 図面の紙面・レイアウト・投影・寸法線・フォント（`view / layout / geometry / fonts`） | 注記・表題欄・図の一覧を**機種が返す**形にする。断面図・平面図の対象は機種が「部品名と切り方（半径方向断面 / 平面外形 / 平面図）」で指定する。員数と一般公差は独立した注記機能にする |
 | `viewer.py` | three.js の自己完結 `viewer.html` の雛形（部品ごとの表示切替・視点） | 部品表（部品名 → 表示名・色）を機種から受け取る。分解表示（軸方向にずらす）を追加。回転アニメは v2 まで入れない |
-| `build.py` | 出力先の stage-and-swap（生成中は一時ディレクトリ、成功したら差し替え、古い出力は `.stale/` へ退避）、`-PROVISIONAL` 接尾辞 | 機種をパッケージ名で発見する（§4.4）。2D 出力の切り方と質量計算（部品ごとの材質）を機種の契約から取る |
+| `build.py` | 出力先の stage-and-swap（生成中は一時ディレクトリ、成功したら差し替え、古い出力は `.stale/` へ退避。検査やエクスポートが例外を投げたときも fatal と同じく退避し、機種名つきで報告して次の機種へ進み、最後に失敗した機種を並べて非 0 で終わる）、`-PROVISIONAL` 接尾辞 | 機種をパッケージ名で発見する（§4.4）。2D 出力の切り方と質量計算（部品ごとの材質）を機種の契約から取る |
 | `tests/` | build / drawing / viewer / geometry のテストの型 | 機種を差し替え。§1.2(4) の grep テストを追加 |
 
 `Source.provisional` の意味は本リポでは「**まだ決めきっていない値**」。1 つでも残れば出力ディレクトリ名に `-PROVISIONAL` が付く。
@@ -127,14 +128,14 @@ blast-tom-series/
 | モジュール | 内容 |
 |---|---|
 | `materials.py` | `Material(name, density)`。SUS304 = 7.93e-3 g/mm³、A6063 = 2.70e-3 g/mm³（Magnum の逃げ道） |
-| `stock.py` | 規格パイプ表（外径 × 肉厚）と丸め。JIS G3446（機械構造用ステンレス鋼管）と手すり用 #400 研磨管（φ25.4 / 31.8 / 38.1 / 42.7 / 50.8 × t1.2 / 1.5）、JIS G3459（配管用）。`nearest(od, t)` は最寄りの規格を `derived` で返し、ずれが閾値（既定 1.0 mm）を超えたら警告 `Issue`。**採用する径・肉厚は `docs/vendors.md` に実在品番で登録してから使う** |
+| `stock.py` | 規格パイプ表（外径 × 肉厚）と丸め。JIS G3446（機械構造用ステンレス鋼管）と手すり用 #400 研磨管（φ25.4 / 31.8 / 38.1 / 42.7 / 50.8 × t1.2 / 1.5）、JIS G3459（配管用）。`nearest(od, t)` は最寄りの規格を `derived` で返し、外径のずれが閾値（既定 1.0 mm）、肉厚のずれが `thickness_tolerance`（既定 0.5 mm）を超えたら警告 `Issue`（どちらがずれても 1 つの `Issue` に両方を書く）。**採用する径・肉厚は `docs/vendors.md` に実在品番で登録してから使う** |
 | `acoustics/model.py` | `AcousticModel` の定義。膜（半径・面密度・(0,1) 非結合基音の範囲・損失係数）、プレナム（半径・長さ）、管（本数・内半径・長さ・両端の種別）、観測点 |
 | `acoustics/tmm.py` | 伝達行列（ABCD）。円筒セグメント（Keefe の熱粘性損失込み）、面積不連続、並列分岐（同一管 N 本）、開口端の放射インピーダンス（Levine–Schwinger の近似。フランジ付き / 無し） |
 | `acoustics/membrane.py` | 円形膜の軸対称モード (0,1) (0,2) の有効質量・有効剛性・有効面積。Bessel 零点は定数表（j01 = 2.4048, j02 = 5.5201）で持ち scipy を入れない。非軸対称モード (1,1) (2,1) は体積変化が無く結合しないので、表示用に周波数だけ出す |
 | `acoustics/coupled.py` | 膜 (0,n) ＋ プレナム（短い円筒セグメント）＋ 管 N 本の**結合系の複素固有値**。膜側の空気の付加質量、膜の損失、両開口の放射抵抗を含む。最低根がヘルムホルツ相当、以降が膜寄り・管寄りの根。各根に膜／管の寄与率を付ける |
 | `acoustics/synth.py` | 膜の打撃 → 観測点の音圧の伝達関数を周波数領域で組み、ヘッド面と管先端の放射を観測点で複素加算し、逆 FFT でインパルス応答 → 16-bit / 48 kHz の wav |
 | `acoustics/report.py` | 共鳴表（Markdown）と sweep の比較表。列は結合系の最低 4 根（周波数・Q・T60・膜／管寄与率） |
-| `bom.py` | 部品表。行 = 部品名・製作品／既製品・素材・規格・寸法・員数・型番・質量（製作品は形状から、既製品は `spec` の値） |
+| `bom.py` | 部品表。行 = 部品名・製作品／既製品・素材・規格・寸法・員数・型番・質量（製作品の質量は形状から solid 1 個分を出し、合計で × 員数。規格・寸法は `PartInfo` から。既製品は `spec` の値） |
 | `process.py` | 工程数量表。レーザー切り部品点数、ロール曲げ回数、TIG 総長、旋削部品数、研磨面積、タップ数。工賃欄は空で、見積もりの項目表として使う。材料費は規格材の m 単価 × 長さ（単価は `docs/vendors.md` から `spec`） |
 
 ### 4.3 音響モデルの限界（`docs/acoustics.md` に明記）
@@ -152,9 +153,9 @@ blast-tom-series/
 ```python
 SPEC: object                                   # dataclass(frozen=True) の寸法ツリー。葉は Dim または Choice
 def name(spec) -> str                          # 出力ディレクトリ名の語幹。例 "gatling-6-6"（機種-径inch-ラグ数）
-def override(spec, **path_values) -> object    # "tube.length": 500 のような属性パスで差し替えた SPEC を返す（sweep 用）
-def assembly(spec) -> dict[str, cq.Workplane]  # 製作品の部品名 → 形状（組立座標系）。既製品は簡略形状でよい
-def parts(spec) -> list[PartInfo]              # 部品名・表示名・色・材質・製作品/既製品・2D の切り方（半径断面/平面外形/平面図/なし）・員数
+def override(spec, **path_values) -> object    # "tube.length": 500 のような属性パスで差し替えた SPEC を返す（sweep 用）。パスは `a.b[0]`（tuple / list）、`a.b['key']`（dict）まで。set の中は順序が無いので対象外（`TypeError`）
+def assembly(spec) -> dict[str, cq.Workplane]  # 製作品の部品名 → 形状（組立座標系）。員数ぶんの solid をすべて置く（solid 数 = PartInfo.count、違えば fatal）。既製品は簡略形状でよい
+def parts(spec) -> list[PartInfo]              # 部品名・表示名・色・材質・製作品/既製品・2D の切り方（半径断面/平面外形/平面図/なし）・員数（1 以上。0 の部品は載せない）・規格・寸法（BOM の「規格・型番の系統」「寸法」。製作品の行に使う。既定は空）
 def bom(spec) -> list[BomRow]                  # 既製品の型番と員数を含む部品表
 def drawing(spec) -> DrawingSpec               # 表題欄の行・注記の行・図の一覧・一般公差・平面度などの幾何公差
 def issues(spec) -> list[Issue]                # 整合性チェック。fatal が無ければ出力可

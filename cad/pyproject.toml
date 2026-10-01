@@ -1,0 +1,30 @@
+[project]
+name = "blast-tom-cad"
+version = "0.1.0"
+description = "Blast Tom Series のパラメトリック CAD（STEP / 図面 / viewer / 音響）"
+readme = "README.md"
+
+# CadQuery が依存する OCP のホイールは 3.12 までしか無い。3.12 で固定する。
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+    "cadquery>=2.5",
+    "ezdxf>=1.4",
+    "matplotlib>=3.9",
+    "numpy>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.uv]
+# ロックファイルを必ず使う。寸法が同じなら誰が回しても同一の STEP が出ること。
+package = false
+
+[tool.pytest.ini_options]
+# パッケージとしてインストールしない（package = false）ので、
+# テストから drumcad と build を import できるよう cad/ を通す。
+pythonpath = ["."]
+testpaths = ["tests"]

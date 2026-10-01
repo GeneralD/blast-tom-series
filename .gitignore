@@ -14,3 +14,8 @@ cad/out/
 .venv/
 __pycache__/
 *.pyc
+
+# Claude Code local state
+.claude/worktrees/
+.claude/settings.local.json
+CLAUDE.local.md
