@@ -163,3 +163,49 @@ def test_main_builds_every_model_by_default(tmp_path, monkeypatch):
     monkeypatch.setattr(build, "ROOT", TESTS)
     assert build.main(["build.py"]) == 0
     assert (tmp_path / "demo-6-6-PROVISIONAL" / "viewer.html").exists()
+
+
+def test_an_exception_during_the_checks_hides_the_previous_output_and_names_the_model(tmp_path, capsys, demo):
+    build.build(demo)
+
+    class Boom(_Module):
+        def issues(self, spec):
+            raise RuntimeError("検査中の失敗")
+
+    broken = dataclasses.replace(demo, _module=Boom(demo._module, demo.parts()))
+    with pytest.raises(RuntimeError, match="検査中の失敗"):
+        build.build(broken)
+    assert not (tmp_path / "demo-6-6-PROVISIONAL").exists()
+    assert (tmp_path / "demo-6-6-PROVISIONAL.stale" / "assembly.step").exists()
+    assert "demo" in capsys.readouterr().out
+
+
+def test_an_exception_during_the_export_hides_the_previous_output(tmp_path, monkeypatch, demo):
+    build.build(demo)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("エクスポート中の失敗")
+
+    monkeypatch.setattr(build, "_export_part", boom)
+    with pytest.raises(RuntimeError, match="エクスポート中の失敗"):
+        build.build(demo)
+    assert not (tmp_path / "demo-6-6-PROVISIONAL").exists()
+    assert (tmp_path / "demo-6-6-PROVISIONAL.stale" / "assembly.step").exists()
+
+
+def test_main_goes_on_to_the_next_model_after_one_raises_and_exits_nonzero(monkeypatch, capsys):
+    monkeypatch.setattr(build, "discover", lambda root: {"a": object(), "b": object()})
+    seen = []
+
+    def fake_build(model):
+        seen.append(model)
+        if len(seen) == 1:
+            raise RuntimeError("a の失敗")
+        return 0
+
+    monkeypatch.setattr(build, "build", fake_build)
+    assert build.main(["build.py"]) == 1
+    assert len(seen) == 2
+    captured = capsys.readouterr()
+    assert "RuntimeError" in captured.err and "a の失敗" in captured.err     # トレースバックは出す
+    assert "a" in captured.err.splitlines()[-1]                              # 最後に失敗した機種を並べる

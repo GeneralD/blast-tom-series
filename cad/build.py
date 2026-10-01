@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import shutil
 import sys
+import traceback
 from pathlib import Path
 
 import cadquery as cq
@@ -94,7 +95,24 @@ def _export_all(model: Model, out_dir: Path) -> None:
 
 
 def build(model: Model) -> int:
-    """1 機種分を出力する。致命的な問題の件数を返す。"""
+    """1 機種分を出力する。致命的な問題の件数を返す。
+
+    検査やエクスポートが例外を投げたときも、fatal と同じく前回の出力を `.stale` へ退避してから
+    例外を投げ直す（前回の出力が現役の名前のまま残ると、今回の失敗が見えない）。
+    """
+    try:
+        return _build(model)
+    except Exception:
+        print(f"  ❌ {model.key}: 例外で止まった。前回の出力があれば退避する", file=sys.stderr)
+        try:
+            for d in _stale_dirs(model, keep=None):
+                print(f"     前回の出力 {d.name}/ を {_quarantine(d).name}/ へ退避した", file=sys.stderr)
+        except Exception:       # 機種名が引けない・退避に失敗しても、元の例外を隠さない
+            traceback.print_exc()
+        raise
+
+
+def _build(model: Model) -> int:
     print(f"\n=== {model.name()} ===")
     # 検査はエクスポートより先。後ろに置くと、致命的な問題を抱えた STEP が残ったまま終わる。
     found = [*model.issues(), *count_issues(model.assembly(), model.parts())]
@@ -134,11 +152,19 @@ def main(argv: list[str]) -> int:
         print(f"知らない機種: {', '.join(unknown)}", file=sys.stderr)
         print(f"使えるのは: {', '.join(models)}", file=sys.stderr)
         return 2
-    fatal = sum(build(models[n]) for n in names)
+    fatal, failed = 0, []
+    for n in names:
+        try:
+            fatal += build(models[n])
+        except Exception:
+            traceback.print_exc()       # 握りつぶさない。後続の機種は作る
+            failed.append(n)
     print(f"\n出力先: {OUT}")
     if fatal:
         print(f"❌ 噛み合わせの致命的な問題が {fatal} 件ある", file=sys.stderr)
-    return 1 if fatal else 0
+    if failed:
+        print(f"❌ 例外で作れなかった機種: {', '.join(failed)}", file=sys.stderr)
+    return 1 if fatal or failed else 0
 
 
 if __name__ == "__main__":
