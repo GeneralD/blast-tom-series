@@ -45,7 +45,7 @@ class Derived:
     tube_cut_length: Dim     # 製作時の管の切り出し長（切り詰め代を含む）
 
 
-FILM_DENSITY = 1.39e-3       # g/mm³（PET フィルムの一般的な値）
+FILM_DENSITY = provisional(1.39e-3, "PET フィルムの一般値（g/mm³）。コーティングは含めない（PR 4）")
 MIL = 0.0254                 # mm
 
 
@@ -69,8 +69,8 @@ def derive(spec: GatlingSpec) -> Derived:
         shell_id=derived_from(shell_id, "胴外径 − 2 × 肉厚", {**shell_in, "shell.thickness": spec.shell.thickness}),
         head_od=derived_from(head_od, "フレッシュフープ内径 + 2 × 肉厚",
                              {"head.fit_id": h.fit_id, "head.collar_wall": h.collar_wall}),
-        areal_density=derived_from(float(h.film_mil) * MIL * FILM_DENSITY, "膜厚 × 1.39 g/cm³",
-                                   {"head.film_mil": h.film_mil}),
+        areal_density=derived_from(float(h.film_mil) * MIL * float(FILM_DENSITY), "膜厚 × 1.39 g/cm³",
+                                   {"head.film_mil": h.film_mil, "FILM_DENSITY": FILM_DENSITY}),
         tube_pitch=derived_from(pitch, "od × (1 + gap_ratio)", tube_in),
         pcd=derived_from(pcd, "中心間 / sin(180° / 本数)", tube_in),
         bolt_circle=derived_from(bolt_circle, "胴外径 + 2 × ボルト座", {**shell_in, "flange.bolt_seat": f.bolt_seat}),

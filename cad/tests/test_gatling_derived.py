@@ -87,6 +87,12 @@ def test_a_derived_value_becomes_derived_once_every_input_that_feeds_it_is_settl
     assert derive(_settled(spec, head=head)).plate_od.source is Source.DERIVED
 
 
+def test_areal_density_stays_provisional_even_when_the_film_thickness_is_settled():
+    head = dataclasses.replace(SPEC.head, film_mil=design(7))
+    d = derive(_settled(SPEC, head=head)).areal_density
+    assert d.source is Source.PROVISIONAL and "FILM_DENSITY" in d.note   # 密度（PET の一般値）が仮のまま効く
+
+
 def test_override_moves_the_derived_values_with_it():
     wide = derive(override(SPEC, tube__gap_ratio=0.8))
     assert float(wide.tube_pitch) == pytest.approx(38.1 * 1.8)
