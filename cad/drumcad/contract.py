@@ -73,9 +73,15 @@ class Model:
         return self._module.issues(self.spec)
 
     @property
-    def drawing(self) -> Callable | None:
-        return getattr(self._module, "drawing", None)
+    def drawing(self) -> Callable[[], Any] | None:
+        return self._bound("drawing")
 
     @property
-    def acoustic_model(self) -> Callable | None:
-        return getattr(self._module, "acoustic_model", None)
+    def acoustic_model(self) -> Callable[[], Any] | None:
+        return self._bound("acoustic_model")
+
+    def _bound(self, hook: str) -> Callable[[], Any] | None:
+        """任意の関数を SPEC に束縛した無引数の callable にする。無ければ None。
+        必須の 7 つと同じく、呼ぶ側は SPEC を渡さなくてよい。"""
+        fn = getattr(self._module, hook, None)
+        return None if fn is None else (lambda: fn(self.spec))

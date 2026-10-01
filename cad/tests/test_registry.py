@@ -35,3 +35,15 @@ def test_required_names_match_the_spec_contract():
 def test_optional_hooks_read_as_none_when_absent():
     m = discover(TESTS)["demo"]
     assert m.drawing is None and m.acoustic_model is None
+
+
+def test_optional_hooks_are_bound_to_the_spec_like_the_required_ones():
+    import dataclasses
+    from types import SimpleNamespace
+
+    demo = discover(TESTS)["demo"]
+    module = SimpleNamespace(drawing=lambda spec: ("drawing", spec),
+                             acoustic_model=lambda spec: ("acoustic", spec))
+    m = dataclasses.replace(demo, _module=module)
+    assert m.drawing() == ("drawing", demo.spec)           # 引数なしで呼べる
+    assert m.acoustic_model() == ("acoustic", demo.spec)
