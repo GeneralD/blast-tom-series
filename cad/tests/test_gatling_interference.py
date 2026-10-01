@@ -2,21 +2,16 @@
 
 1. 形が干渉する（または `assembly()` が例外を投げる）override は、`issues()` が fatal を返す（軽い）。
 2. 境界の内側（干渉しない側）の override は、`issues()` が fatal 0 で、`assembly()` の部品どうしの重なりも 0（重い。代表だけ）。
-   ボルトとねじ込む相手（下穴）は既定でも重なるので除く。
+   ボルトとねじ込む相手（下穴）は既定でも重なるので除く（`gatling_overlap.py`）。
 """
 
 from __future__ import annotations
 
-import itertools
-
-import cadquery as cq
 import pytest
 from drumcad.checks import fatal_count
-from gatling.assemble import assembly
 from gatling.checks import issues
 from gatling.params import SPEC, override
-
-THREADED = {frozenset(p) for p in [("band", "bolt_band"), ("bolt_flange", "header"), ("clamp_tip", "bolt_tip")]}
+from gatling_overlap import overlaps
 
 
 @pytest.mark.parametrize("values", [
@@ -41,18 +36,6 @@ def test_an_override_that_breaks_the_shape_is_fatal(values):
     assert fatal_count(issues(override(SPEC, **values))) >= 1, values
 
 
-def _overlaps(spec) -> list[str]:
-    shapes = {n: cq.Compound.makeCompound(p.solids().vals()) for n, p in assembly(spec).items()}
-    found = []
-    for a, b in itertools.combinations(shapes, 2):
-        if frozenset((a, b)) in THREADED:
-            continue
-        volume = shapes[a].intersect(shapes[b]).Volume()
-        if volume > 1e-3:
-            found.append(f"{a}∩{b} = {volume:.1f}")
-    return found
-
-
 @pytest.mark.parametrize("values", [
     {"lug.count": 24, "hoop.ear.count": 24, "cradle.clearance": 17},                                  # 3・11 の内側
     {"cradle.handle_length": 31.2, "mount.body_height": 51},                                          # 8・9 の内側
@@ -67,4 +50,4 @@ def _overlaps(spec) -> list[str]:
 def test_an_override_just_inside_the_checks_builds_without_any_overlap(values):
     spec = override(SPEC, **values)
     assert fatal_count(issues(spec)) == 0, [i.what for i in issues(spec)]
-    assert _overlaps(spec) == []
+    assert overlaps(spec) == []
