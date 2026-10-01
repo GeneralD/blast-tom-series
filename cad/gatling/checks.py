@@ -75,3 +75,61 @@ def structure(spec: GatlingSpec) -> list[Issue]:
             or flat * math.tan(math.radians(float(e.angle))) >= float(e.height)):
         found.append(Issue(True, "ベアリングエッジの形が成り立たない（角度は 0〜90°、幅 > R、R < 高さ、面の落ち < 高さ）"))
     return found
+
+
+def _at_least(what: str, value: float, floor: float, fatal: bool = True) -> list[Issue]:
+    """`value` が `floor` 以上であること（縁ちょうどは通す）。"""
+    return [] if value >= floor - EPS else [Issue(fatal, f"{what}（{value:.2f} < {floor:.2f}）")]
+
+
+def _at_most(what: str, value: float, ceiling: float, fatal: bool = True) -> list[Issue]:
+    return [] if value <= ceiling + EPS else [Issue(fatal, f"{what}（{value:.2f} > {ceiling:.2f}）")]
+
+
+def tubes_apart(gap_ratio: float) -> list[Issue]:
+    """管同士が干渉しない（隙間比 > 0）。"""
+    return [] if gap_ratio > 0 else [Issue(True, f"管同士が干渉する（tube.gap_ratio = {gap_ratio:g} は正でなければならない）")]
+
+
+def plate_size(plate_od: float, shell_id: float, shell_od: float, max_over_shell: float) -> list[Issue]:
+    """ヘッダープレートの外径が胴内径以上（蓋になる）で、胴外径 + 上限以下。"""
+    return (_at_least("ヘッダープレートが胴の内径より小さく、蓋にならない", plate_od, shell_id)
+            + _at_most("ヘッダープレートが大きすぎる（胴外径 + 上限を超える）", plate_od, shell_od + max_over_shell))
+
+
+def bolt_clearances(spec: GatlingSpec) -> list[Issue]:
+    """フランジのボルト穴: 管外面・板縁・胴への距離が縁以上、管の方位からずれている。"""
+    d, margin = derive(spec), float(spec.plate.margin)
+    od, screw = float(spec.tube.od), lookup_screw(spec.flange.bolt)
+    bolts, tubes = flange_bolt_points(spec), tube_points(spec)
+    to_tube = min(math.hypot(bx - tx, by - ty) for bx, by in bolts for tx, ty in tubes) - od / 2
+    to_edge = float(d.plate_od) / 2 - float(d.bolt_circle) / 2
+    to_shell = float(spec.flange.bolt_seat) - float(screw.head_dia) / 2
+    pitch = 360.0 / float(spec.tube.count)
+    shifted = abs(((float(spec.flange.bolt_phase) + pitch / 2) % pitch) - pitch / 2) > EPS
+    found = (_at_least("ボルト穴と管外面の距離が縁に足りない", to_tube, margin)
+             + _at_least("ボルト穴と板縁の距離が縁に足りない", to_edge, margin)
+             + _at_least("ボルトの頭が胴の外面にかかる（ボルト座が頭の半径に足りない）", to_shell, 0.0))
+    if not shifted:
+        found.append(Issue(True, f"フランジのボルトが管と同じ方位にある（bolt_phase = {float(spec.flange.bolt_phase):g}° は管の間隔 {pitch:g}° の倍数）"))
+    return found
+
+
+def tubes_inside_bore(spec: GatlingSpec) -> list[Issue]:
+    """管の外面が胴の内径に収まる。はみ出すとフランジが管の開口を塞ぐ（警告）。"""
+    d = derive(spec)
+    reach = float(d.pcd) / 2 + float(spec.tube.od) / 2
+    return _at_most("管の外面が胴の内径からはみ出し、開口の一部をフランジが塞ぐ", reach, float(d.shell_id) / 2, fatal=False)
+
+
+def tube_clamps(spec: GatlingSpec) -> list[Issue]:
+    """先端の突き出しが 0 以上、中間クランプの比が 0〜1、中間クランプがヘッダープレートにも先端クランプにも重ならない。"""
+    z, c = levels(spec), spec.clamp
+    found = _at_least("先端クランプの突き出しが負", float(spec.tube.protrusion_ratio), 0.0)
+    found += _at_least("中間クランプの位置の比が 0 未満", float(c.mid_position), 0.0)
+    found += _at_most("中間クランプの位置の比が 1 を超える", float(c.mid_position), 1.0)
+    found += _at_least("中間クランプがヘッダープレートに重なる（ヘッダー下面と中間クランプの距離）", z.header_bottom - z.mid_top, 0.0)
+    found += _at_least("中間クランプが先端クランプに重なる（クランプ間の距離）", z.mid_bottom - z.tip_top, 0.0)
+    d = derive(spec)
+    found += _at_least("中間クランプ中央の穴径が 0 以下（管が詰まりすぎ）", float(d.clamp_hole_d), EPS)
+    return found
