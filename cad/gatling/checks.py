@@ -143,3 +143,44 @@ def tube_clamps(spec: GatlingSpec) -> list[Issue]:
     d = derive(spec)
     found += _at_least("中間クランプ中央の穴径が 0 以下（管が詰まりすぎ）", float(d.clamp_hole_d), EPS)
     return found
+
+
+def aligned(tube_count: int, lug_count: int, ear_count: int) -> list[Issue]:
+    """管・ラグ・受金の方位が揃う。管の本数がラグ数の倍数または約数で、受金はラグと同数。"""
+    found = []
+    if tube_count % lug_count and lug_count % tube_count:
+        found.append(Issue(True, f"管 {tube_count} 本とラグ {lug_count} 個の方位が揃わない（一方が他方の倍数でない）"))
+    if ear_count != lug_count:
+        found.append(Issue(True, f"受金 {ear_count} 枚がラグ {lug_count} 個と同数でない"))
+    return found
+
+
+def rod_fits(spec: GatlingSpec) -> list[Issue]:
+    """ロッドが内外リングの間を通り、ラグの下端から受金の上面まで届く。
+
+    必要長は式の項を並べず、`levels()` の高さから出す（受金の上面 − ラグの下端）。その間には
+    ラグ・締め代・フレッシュフープの高さ・フープ・受金の厚みが入る（仕様 §5.3 もこの測り方で
+    書く。仕様側の直しの 6）。
+    """
+    r, z, major = radii(spec), levels(spec), float(lookup_rod(spec.lug.thread))
+    found = _at_least("ロッドが内リングに当たる（中心半径が足りない）", r.rod - major / 2, r.hoop_in_outer)
+    found += _at_most("ロッドが外リングに当たる（中心半径が大きすぎる）", r.rod + major / 2, r.hoop_out_inner)
+    need = z.ear_top - z.lug_bottom
+    return found + _at_least("ロッドが短い（ラグの下端から受金の上面まで届かない）", float(spec.lug.rod_length), need)
+
+
+def hoop_seat(spec: GatlingSpec) -> list[Issue]:
+    """内リングがフレッシュフープの環の上面だけに載る（掛かりが環の肉厚を超えると、膜に載って膜を押す）。"""
+    return _at_most("内リングがフレッシュフープの内側まで掛かり、膜に載る（hoop.seat が環の肉厚を超える）",
+                    float(spec.hoop.seat), float(spec.head.collar_wall))
+
+
+def lug_fits(spec: GatlingSpec) -> list[Issue]:
+    """胴の取付穴がラグの高さと胴の高さに収まり、ラグが胴バンドに重ならない。"""
+    z = levels(spec)
+    zc, half = (z.lug_top + z.lug_bottom) / 2, float(spec.lug.pitch) / 2 + float(spec.lug.hole_dia) / 2
+    return (_at_least("ラグの取付穴が胴の下端（フランジ）にかかる", zc - half, z.flange_top)
+            + _at_most("ラグの取付穴が胴の上端にかかる", zc + half, z.shell_top)
+            + _at_least("ラグの取付穴がラグの高さから下に外れる", zc - half, z.lug_bottom)
+            + _at_most("ラグの取付穴がラグの高さから上に外れる", zc + half, z.lug_top)
+            + _at_least("ラグが胴バンドに重なる（ラグ下端とバンド上端の距離）", z.lug_bottom, z.band_top))
