@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from gatling.checks import bolt_clearances, plate_size, tube_clamps, tubes_apart, tubes_inside_bore
+from gatling.checks import bolt_clearances, plate_size, tip_bolts_clear, tube_clamps, tubes_apart, tubes_inside_bore
 from gatling.params import SPEC, override
 
 
@@ -122,3 +122,12 @@ def test_clamps_that_overlap_each_other_are_fatal():
 
 def test_a_centre_hole_that_would_be_zero_or_negative_is_fatal():
     assert any("中央の穴" in w for w in _fatal(tube_clamps(override(SPEC, plate__margin=40))))
+
+
+def test_a_tip_bolt_head_that_reaches_a_tube_is_fatal():
+    """先端クランプの意匠ボルトは管の間（30° ずれ、同じ中心円）。頭（φ8.5）が管の外面（半径 19.05）に届くと当たる。
+    中心間 = 2 × 中心円半径 × sin 15° ≥ 19.05 + 4.25 → gap_ratio ≥ 約 0.1815。"""
+    for ratio in (0.1, 0.18):
+        assert any("先端クランプ" in i.what and "管" in i.what for i in tip_bolts_clear(override(SPEC, tube__gap_ratio=ratio)) if i.fatal), ratio
+    assert tip_bolts_clear(override(SPEC, tube__gap_ratio=0.19)) == []
+    assert tip_bolts_clear(SPEC) == []

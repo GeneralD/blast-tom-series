@@ -17,7 +17,7 @@ from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_r
 from .derived import derive
 from .params import GatlingSpec
 from .placement import (cradle_corner, cradle_y_rear, flange_bolt_points, grip_y, levels, lug_angles, lug_box, radii,
-                        tube_points)
+                        tip_bolt_points, tube_points)
 
 EPS = 1e-6                    # 縁ちょうどの値が浮動小数の誤差で fatal にならないように
 MIN_ENGAGEMENT = 0.75         # ねじ込み長 / 呼び径の下限（下回ると警告）
@@ -275,6 +275,17 @@ def tube_clamps(spec: GatlingSpec) -> list[Issue]:
     return found
 
 
+def tip_bolts_clear(spec: GatlingSpec) -> list[Issue]:
+    """先端クランプの意匠ボルトの頭が管の外面に当たらない（ボルトと管の中心間 ≥ 管の半径 + 頭の半径）。
+
+    頭はクランプの下面に座り、管はクランプの下へ突き出す（突き出し ≥ 0）ので、軸ではなく頭の径で見る。
+    """
+    head = float(lookup_screw(spec.clamp.bolt).head_dia) / 2
+    gap = min(math.dist(b, t) for b in tip_bolt_points(spec) for t in tube_points(spec))
+    return _at_least("先端クランプのボルトの頭が管に当たる（ボルトと管の中心間 < 管の半径 + 頭の半径）", gap,
+                     float(spec.tube.od) / 2 + head)
+
+
 def aligned(tube_count: int, lug_count: int, ear_count: int) -> list[Issue]:
     """管・ラグ・受金の方位が揃う。管の本数がラグ数の倍数または約数で、受金はラグと同数。"""
     found = []
@@ -399,7 +410,7 @@ def issues(spec: GatlingSpec) -> list[Issue]:
     d = derive(spec)
     found += tubes_apart(spec)
     found += plate_size(float(d.plate_od), float(d.shell_id), float(d.shell_od), float(spec.plate.max_over_shell))
-    found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec)
+    found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec) + tip_bolts_clear(spec)
     found += aligned(int(float(spec.tube.count)), int(float(spec.lug.count)), int(float(spec.hoop.ear.count)))
     found += rod_fits(spec) + hoop_seat(spec) + ear_fits(spec) + lug_fits(spec) + cradle_fits(spec) + holder_fits(spec) + bolt_lengths(spec)
     found += mount_clear(spec)
