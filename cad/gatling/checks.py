@@ -288,12 +288,16 @@ def aligned(tube_count: int, lug_count: int, ear_count: int) -> list[Issue]:
 def rod_fits(spec: GatlingSpec) -> list[Issue]:
     """ロッドが内外リングの間を通り、ラグの下端から受金の上面まで届く。
 
+    内側は内リングとフレッシュフープの外面の大きいほう、外側は外リングの内面。
     必要長は式の項を並べず、`levels()` の高さから出す（受金の上面 − ラグの下端）。その間には
     ラグ・締め代・フレッシュフープの高さ・フープ・受金の厚みが入る（仕様 §5.3 もこの測り方で
     書く。仕様側の直しの 6）。
     """
     r, z, major = radii(spec), levels(spec), float(lookup_rod(spec.lug.thread))
-    found = _at_least("ロッドが内リングに当たる（中心半径が足りない）", r.rod - major / 2, r.hoop_in_outer)
+    # 内側の下限: ロッドはフープの高さだけでなくフレッシュフープの高さも通る。内リングを薄くして掛かりを増やすと、
+    # フレッシュフープの外面のほうが外に出る
+    inner, what = max((r.hoop_in_outer, "内リング"), (r.collar, "フレッシュフープ"))
+    found = _at_least(f"ロッドが{what}に当たる（中心半径が足りない）", r.rod - major / 2, inner)
     found += _at_most("ロッドが外リングに当たる（中心半径が大きすぎる）", r.rod + major / 2, r.hoop_out_inner)
     need = z.ear_top - z.lug_bottom
     return found + _at_least("ロッドが短い（ラグの下端から受金の上面まで届かない）", float(spec.lug.rod_length), need)
@@ -303,6 +307,19 @@ def hoop_seat(spec: GatlingSpec) -> list[Issue]:
     """内リングがフレッシュフープの環の上面だけに載る（掛かりが環の肉厚を超えると、膜に載って膜を押す）。"""
     return _at_most("内リングがフレッシュフープの内側まで掛かり、膜に載る（hoop.seat が環の肉厚を超える）",
                     float(spec.hoop.seat), float(spec.head.collar_wall))
+
+
+def ear_fits(spec: GatlingSpec) -> list[Issue]:
+    """受金の幅が、ロッド通し穴の両側に肉を残す（幅 ≥ 穴径 + 2 × 板厚）。幅が穴径以下だと受金が 2 片に割れる。
+
+    肉の下限は受金の板厚を流用する。穴の縁から板の縁までを板厚以上取るのは、打ち抜きや穴あけで縁が割れたり
+    曲がったりしない一般的な目安で、受金を新しい寸法で増やさずに済む。`plate.margin`（8）は削り出しの板の
+    縁で、既定の幅 20 では足りない（6.5 + 16 = 22.5）ので使わない。
+    """
+    e = spec.hoop.ear
+    hole = float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)
+    return _at_least("受金の幅がロッド通し穴の両側の肉（板厚）に足りない（穴径 + 2 × 板厚）", float(e.width),
+                     hole + 2 * float(e.thickness))
 
 
 def lug_fits(spec: GatlingSpec) -> list[Issue]:
@@ -384,6 +401,6 @@ def issues(spec: GatlingSpec) -> list[Issue]:
     found += plate_size(float(d.plate_od), float(d.shell_id), float(d.shell_od), float(spec.plate.max_over_shell))
     found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec)
     found += aligned(int(float(spec.tube.count)), int(float(spec.lug.count)), int(float(spec.hoop.ear.count)))
-    found += rod_fits(spec) + hoop_seat(spec) + lug_fits(spec) + cradle_fits(spec) + holder_fits(spec) + bolt_lengths(spec)
+    found += rod_fits(spec) + hoop_seat(spec) + ear_fits(spec) + lug_fits(spec) + cradle_fits(spec) + holder_fits(spec) + bolt_lengths(spec)
     found += mount_clear(spec)
     return found + stock_warning(spec)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from gatling.checks import aligned, hoop_seat, lug_fits, rod_fits
+from gatling.checks import aligned, ear_fits, hoop_seat, lug_fits, rod_fits
 from gatling.params import SPEC, override
 from gatling.placement import levels
 
@@ -13,7 +13,7 @@ def _fatal(issues):
 
 
 def test_the_default_hoop_lugs_and_rods_pass():
-    assert aligned(6, 6, 6) == [] and rod_fits(SPEC) == [] and lug_fits(SPEC) == [] and hoop_seat(SPEC) == []
+    assert aligned(6, 6, 6) == [] and rod_fits(SPEC) == [] and lug_fits(SPEC) == [] and hoop_seat(SPEC) == [] and ear_fits(SPEC) == []
 
 
 @pytest.mark.parametrize("tubes, lugs", [(6, 6), (6, 3), (6, 2), (6, 1), (3, 6), (12, 6), (12, 4)])
@@ -80,3 +80,18 @@ def test_mounting_holes_must_fall_inside_the_lug_body():
 def test_the_inner_ring_must_bear_on_the_collar_and_not_on_the_film():
     assert any("膜" in w for w in _fatal(hoop_seat(override(SPEC, hoop__seat=1.6))))         # 肉厚 1.5 を超えると膜に載る
     assert hoop_seat(override(SPEC, hoop__seat=1.5)) == []
+
+
+def test_a_rod_that_does_not_clear_the_collar_is_fatal():
+    """内リングを薄くして掛かりを増やすと、内リングの外面（76.7）がフレッシュフープの外面（77.7）より内側になる。
+    ロッドはフレッシュフープの高さも通るので、内側の下限は 2 つの外面の大きいほう。"""
+    thin = {"hoop.inner.thickness": 0.5, "hoop.seat": 1.5}
+    assert any("フレッシュフープ" in w for w in _fatal(rod_fits(override(SPEC, lug__standoff=4, **thin))))      # 80 − 2.75 = 77.25
+    assert _fatal(rod_fits(override(SPEC, lug__standoff=4.5, **thin))) == []                                # 77.75
+
+
+def test_an_ear_must_leave_a_wall_on_both_sides_of_the_rod_hole():
+    """穴（5.5 + 逃げ 1 = 6.5）の両側に板厚 6 の肉: 幅 18.5 以上。幅が穴径以下だと受金が 2 片に割れる。"""
+    for width in (5, 6.5, 18.4):
+        assert any("受金" in w for w in _fatal(ear_fits(override(SPEC, hoop__ear__width=width)))), width
+    assert ear_fits(override(SPEC, hoop__ear__width=18.5)) == []
