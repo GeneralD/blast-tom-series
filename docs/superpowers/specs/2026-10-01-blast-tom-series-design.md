@@ -155,7 +155,7 @@ SPEC: object                                   # dataclass(frozen=True) の寸�
 def name(spec) -> str                          # 出力ディレクトリ名の語幹。例 "gatling-6-6"（機種-径inch-ラグ数）
 def override(spec, **path_values) -> object    # "tube.length": 500 のような属性パスで差し替えた SPEC を返す（sweep 用）
 def assembly(spec) -> dict[str, cq.Workplane]  # 製作品の部品名 → 形状（組立座標系）。員数ぶんの solid をすべて置く（solid 数 = PartInfo.count、違えば fatal）。既製品は簡略形状でよい
-def parts(spec) -> list[PartInfo]              # 部品名・表示名・色・材質・製作品/既製品・2D の切り方（半径断面/平面外形/平面図/なし）・員数・規格・寸法（BOM の「規格・型番の系統」「寸法」。製作品の行に使う。既定は空）
+def parts(spec) -> list[PartInfo]              # 部品名・表示名・色・材質・製作品/既製品・2D の切り方（半径断面/平面外形/平面図/なし）・員数（1 以上。0 の部品は載せない）・規格・寸法（BOM の「規格・型番の系統」「寸法」。製作品の行に使う。既定は空）
 def bom(spec) -> list[BomRow]                  # 既製品の型番と員数を含む部品表
 def drawing(spec) -> DrawingSpec               # 表題欄の行・注記の行・図の一覧・一般公差・平面度などの幾何公差
 def issues(spec) -> list[Issue]                # 整合性チェック。fatal が無ければ出力可

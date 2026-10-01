@@ -26,3 +26,15 @@ def test_count_issues_is_fatal_when_the_solid_count_differs_from_the_part_count(
     assert missing.fatal
     [extra] = count_issues({"a": three}, [])
     assert extra.fatal
+
+
+def test_count_issues_is_fatal_when_the_part_count_is_below_one():
+    from types import SimpleNamespace as NS
+
+    import cadquery as cq
+    from drumcad.checks import count_issues
+
+    for bad in (0, -1):
+        [issue] = count_issues({"a": cq.Workplane("XY")}, [NS(name="a", label="A", count=bad)])
+        assert issue.fatal and "A" in issue.what and "1 以上" in issue.what
+
