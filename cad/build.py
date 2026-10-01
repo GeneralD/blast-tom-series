@@ -115,7 +115,11 @@ def build(model: Model) -> int:
 def _build(model: Model) -> int:
     print(f"\n=== {model.name()} ===")
     # 検査はエクスポートより先。後ろに置くと、致命的な問題を抱えた STEP が残ったまま終わる。
-    found = [*model.issues(), *count_issues(model.assembly(), model.parts())]
+    found = list(model.issues())
+    # fatal があるときは assembly() を呼ばない。作れない寸法だと assembly() が例外になり、
+    # 静かに止まるはずの fatal が例外に化ける
+    if not fatal_count(found):
+        found += count_issues(model.assembly(), model.parts())
     for issue in found:
         print(f"  {issue}")
     fatal = fatal_count(found)

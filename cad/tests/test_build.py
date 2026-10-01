@@ -13,6 +13,7 @@ import cadquery as cq
 import pytest
 
 import build
+from drumcad.checks import Issue
 from drumcad.dims import Dim, Source
 from drumcad.registry import discover
 
@@ -210,3 +211,19 @@ def test_main_goes_on_to_the_next_model_after_one_raises_and_exits_nonzero(monke
     captured = capsys.readouterr()
     assert "RuntimeError" in captured.err and "alpha の失敗" in captured.err  # トレースバックは出す
     assert captured.err.splitlines()[-1] == "❌ 例外で作れなかった機種: alpha"    # 最後に失敗した機種を並べる
+
+
+def test_a_fatal_issue_stops_the_build_before_assembly_is_ever_asked_for(tmp_path, demo):
+    build.build(demo)
+
+    class Unbuildable(_Module):
+        def issues(self, spec):
+            return [Issue(True, "寸法が CadQuery で作れない値")]
+
+        def assembly(self, spec):
+            raise RuntimeError("作れない寸法で assembly() を呼んだ")
+
+    broken = dataclasses.replace(demo, _module=Unbuildable(demo._module, demo.parts()))
+    assert build.build(broken) == 1              # 例外ではなく fatal 件数で静かに止まる
+    assert not (tmp_path / "demo-6-6-PROVISIONAL").exists()
+    assert (tmp_path / "demo-6-6-PROVISIONAL.stale" / "assembly.step").exists()
