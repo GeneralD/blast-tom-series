@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 
 
@@ -29,9 +30,11 @@ def count_issues(parts: dict, infos: list) -> list[Issue]:
     `assembly()` は員数ぶんの solid を組立座標系に置いて返す契約で、BOM の質量は
     solid 1 個分 × 員数で出す。数が合わないと質量も組立の出力も黙って狂うので、
     出力の前に止める。員数は 1 以上（員数 0 の部品は `parts()` に載せない）。
+    `parts()` の name の重複も止める（出力と viewer が後勝ちで潰し、bom.md と食い違う）。
     """
     named = {i.name for i in infos}
-    found = [Issue(True, f"部品 {n} が parts() に無い") for n in parts if n not in named]
+    found = [Issue(True, f"部品名 {n} が parts() に重複している") for n, k in Counter(i.name for i in infos).items() if k > 1]
+    found += [Issue(True, f"部品 {n} が parts() に無い") for n in parts if n not in named]
     for info in infos:
         if info.count < 1:
             found.append(Issue(True, f"部品 {info.label} の員数 {info.count} は 1 以上でなければならない"))

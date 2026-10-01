@@ -38,3 +38,14 @@ def test_count_issues_is_fatal_when_the_part_count_is_below_one():
         [issue] = count_issues({"a": cq.Workplane("XY")}, [NS(name="a", label="A", count=bad)])
         assert issue.fatal and "A" in issue.what and "1 以上" in issue.what
 
+
+
+def test_count_issues_is_fatal_when_two_parts_share_a_name():
+    from types import SimpleNamespace as NS
+
+    import cadquery as cq
+    from drumcad.checks import count_issues
+
+    one = cq.Workplane("XY").add(cq.Solid.makeCylinder(4, 10))
+    found = count_issues({"a": one}, [NS(name="a", label="A", count=1), NS(name="a", label="B", count=1)])
+    assert any(i.fatal and "a" in i.what and "重複" in i.what for i in found)
