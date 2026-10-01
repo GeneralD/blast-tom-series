@@ -28,3 +28,22 @@ def test_nearest_prefers_the_requested_thickness_within_the_same_od():
 def test_tolerance_is_configurable():
     _, issue = nearest(design(40.0), design(1.2), tolerance=3.0)
     assert issue is None
+
+
+def test_nearest_warns_when_only_the_thickness_is_off():
+    tube, issue = nearest(design(38.1), design(2.6))
+    assert (tube.od, tube.thickness) == (38.1, 2.0)
+    assert issue is not None and not issue.fatal
+    assert "肉厚" in issue.what and "0.6 mm" in issue.what
+    assert "外径" not in issue.what
+
+
+def test_nearest_names_both_od_and_thickness_in_one_issue():
+    _, issue = nearest(design(40.0), design(2.6))
+    assert issue is not None
+    assert "外径" in issue.what and "肉厚" in issue.what
+
+
+def test_thickness_tolerance_is_configurable():
+    _, issue = nearest(design(38.1), design(2.6), thickness_tolerance=1.0)
+    assert issue is None

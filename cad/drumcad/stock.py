@@ -38,15 +38,30 @@ TUBES: tuple[Tube, ...] = tuple(
 )
 
 
-def nearest(od: float, thickness: float, tolerance: float = 1.0) -> tuple[Tube, Issue | None]:
-    """設計値に最も近い規格管と、ずれが `tolerance` を超えたときの警告。
+# 肉厚の既定閾値。仕様 §4.2 が決めているのは外径の 1.0 mm だけなので、肉厚は保守的に選んだ。
+# 規格の肉厚は 1.0〜2.0 mm の 0.2〜0.5 mm 刻みで、0.5 mm 以上ずれると隣の規格に当たる。
+# 肉厚は剛性・重量・溶接の可否に直結するため、外径より厳しく見る。
+DEFAULT_THICKNESS_TOLERANCE = 0.5
+
+
+def nearest(od: float, thickness: float, tolerance: float = 1.0,
+            thickness_tolerance: float = DEFAULT_THICKNESS_TOLERANCE) -> tuple[Tube, Issue | None]:
+    """設計値に最も近い規格管と、ずれが閾値を超えたときの警告。
 
     外径のずれを優先し、同じ外径の中で肉厚が最も近いものを選ぶ。
+    外径が `tolerance`、肉厚が `thickness_tolerance` を超えてずれたら警告する。
+    両方ずれたときも Issue は 1 つで、両方を書く（呼び出し側の型を変えないため）。
     """
     best = min(TUBES, key=lambda t: (abs(t.od - od), abs(t.thickness - thickness)))
-    delta = abs(best.od - od)
+    od_delta = abs(best.od - od)
+    t_delta = abs(best.thickness - thickness)
+    gaps = []
+    if od_delta > tolerance:
+        gaps.append(f"外径 {od:g} は規格径から {od_delta:.1f} mm ずれている")
+    if t_delta > thickness_tolerance:
+        gaps.append(f"肉厚 {thickness:g} は規格肉厚から {t_delta:.1f} mm ずれている")
     issue = None
-    if delta > tolerance:
-        issue = Issue(False, f"外径 {od:g} は規格径から {delta:.1f} mm ずれている"
-                             f"（最寄り {best.family} φ{best.od:g} × t{best.thickness:g}）")
+    if gaps:
+        issue = Issue(False, "、".join(gaps) +
+                      f"（最寄り {best.family} φ{best.od:g} × t{best.thickness:g}）")
     return best, issue
