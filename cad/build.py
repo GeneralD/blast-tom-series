@@ -20,7 +20,7 @@ from cadquery import exporters
 sys.path.insert(0, str(Path(__file__).parent))
 
 from drumcad.bom import bom_markdown, full_bom          # noqa: E402
-from drumcad.checks import fatal_count                  # noqa: E402
+from drumcad.checks import count_issues, fatal_count         # noqa: E402
 from drumcad.contract import Model                      # noqa: E402
 from drumcad.dims import unsettled                      # noqa: E402
 from drumcad.registry import discover                   # noqa: E402
@@ -88,7 +88,7 @@ def build(model: Model) -> int:
     """1 機種分を出力する。致命的な問題の件数を返す。"""
     print(f"\n=== {model.name()} ===")
     # 検査はエクスポートより先。後ろに置くと、致命的な問題を抱えた STEP が残ったまま終わる。
-    found = model.issues()
+    found = [*model.issues(), *count_issues(model.assembly(), model.parts())]
     for issue in found:
         print(f"  {issue}")
     fatal = fatal_count(found)

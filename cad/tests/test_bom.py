@@ -1,3 +1,5 @@
+import math
+import re
 from pathlib import Path
 
 import pytest
@@ -23,6 +25,16 @@ def test_a_fabricated_row_carries_the_standard_and_dimensions_the_model_wrote():
     assert rows["胴"].standard == "手すり用 #400 研磨管"
     assert rows["胴"].dimensions == "φ152.4 × t1.2 × L100"
     assert rows["底板"].standard == "" and rows["底板"].dimensions == ""   # 書かなければ空
+
+
+def test_a_fabricated_row_is_the_mass_of_one_solid_and_the_total_multiplies_by_count():
+    m = discover(TESTS)["demo"]
+    stud = next(r for r in full_bom(m) if r.name == "スタッド")
+    one = math.pi * 4**2 * 100 * 7.93e-3          # φ8 × 100 を 1 個分（3 個全部ではない）
+    assert stud.count == 3 and stud.mass_g == pytest.approx(one, rel=1e-3)
+    total = float(re.search(r"\*\*([\d.]+) kg\*\*", bom_markdown(m.name(), full_bom(m))).group(1))
+    expected = sum(r.mass_g * r.count for r in full_bom(m) if r.mass_g is not None) / 1000
+    assert total == pytest.approx(expected, abs=0.01)
 
 
 def test_bom_markdown_is_a_table_with_a_total_mass():

@@ -93,6 +93,26 @@ def test_build_with_a_fatal_issue_exports_nothing_and_hides_the_previous_output(
     assert not (tmp_path / "demo-6-6").exists()
 
 
+class _Module:
+    """機種モジュールの `parts()` だけを差し替える（員数を solid 数とずらすため）。"""
+
+    def __init__(self, module, parts):
+        self._module, self._parts = module, parts
+
+    def parts(self, spec):
+        return self._parts
+
+    def __getattr__(self, name):
+        return getattr(self._module, name)
+
+
+def test_build_with_a_part_count_that_differs_from_its_solids_is_fatal_and_exports_nothing(tmp_path, demo):
+    wrong = [dataclasses.replace(p, count=2) if p.name == "stud" else p for p in demo.parts()]
+    broken = dataclasses.replace(demo, _module=_Module(demo._module, wrong))
+    assert build.build(broken) == 1
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_main_rejects_an_unknown_model_before_building_anything(monkeypatch, capsys):
     monkeypatch.setattr(build, "ROOT", TESTS)
     assert build.main(["build.py", "nope"]) == 2

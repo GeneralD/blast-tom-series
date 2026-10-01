@@ -15,8 +15,11 @@ def full_bom(model: Model) -> list[BomRow]:
     for info in model.parts():
         if info.made != "fabricated":
             continue
-        rows.append(BomRow(info.label, "fabricated", info.material, info.standard, info.dimensions, info.count,
-                           mass_g=mass_g(parts[info.name], info.material)))
+        part = parts[info.name]
+        # assembly() は員数ぶんの solid を置く。行の質量は 1 個分、合計は呼ぶ側が員数を掛ける
+        one = mass_g(part, info.material) / part.solids().size()
+        rows.append(BomRow(info.label, "fabricated", info.material, info.standard, info.dimensions,
+                           info.count, mass_g=one))
     return rows + list(model.bom())
 
 
