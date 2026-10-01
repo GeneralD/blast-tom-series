@@ -30,6 +30,13 @@ def test_the_parts_without_a_shape_are_counted_from_the_spec():
     assert fewer["ラグボルト"].count == 6 and fewer["ラグ"].count == 3 and fewer["テンションロッド"].count == 3
 
 
+def test_no_two_rows_share_a_name():
+    """行名は部品表の 1 行を指す。同じ名前が 2 行あると、員数がどちらの行のものか読めない。
+    部品表の全体は、製作品の行（表示名）と既製品の行（`bom()`）。"""
+    names = [i.label for i in parts(SPEC) if i.made == "fabricated"] + [r.name for r in bom(SPEC)]
+    assert len(names) == len(set(names)), names
+
+
 def test_part_numbers_are_undecided_until_the_real_parts_are_measured():
     assert all(r.part_number == UNDECIDED == "未定" for r in bom(SPEC))
     assert all(r.mass_g is None and r.material is None for r in bom(SPEC))            # 既製品の質量は載せない

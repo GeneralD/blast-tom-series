@@ -28,6 +28,8 @@ def test_the_halves_leave_a_gap_at_each_split_so_the_bolts_can_squeeze_the_rubbe
     assert not _inside(b, 80, 0, zc) and not _inside(b, -80, 0, zc)               # 分割面（y = 0）の帯は空き
     assert not _inside(b, band_bolt_x(SPEC) + 5, 0, zc)                            # 耳どうしの間も空き
     assert _inside(b, 80, 1.0, zc) and _inside(b, 80, -1.0, zc)                     # 隙間は ±0.75（band.gap 1.5）
+    for x in (80, -80, band_bolt_x(SPEC) + 5, -band_bolt_x(SPEC) - 5):                # 隙間の幅を内側からも挟む
+        assert not _inside(b, x, 0.7, zc) and not _inside(b, x, -0.7, zc), x
     assert _inside(b, band_bolt_x(SPEC) + 5, 0.8, zc) and _inside(b, band_bolt_x(SPEC) + 5, -0.8, zc)
 
 

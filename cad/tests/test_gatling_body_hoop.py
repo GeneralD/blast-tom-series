@@ -7,6 +7,7 @@ import math
 import cadquery as cq
 import pytest
 from gatling.params import SPEC, override
+from gatling.placement import radii
 from gatling.shapes.body import edge, shell
 from gatling.shapes.hoop import ear, hoop_inner, hoop_outer
 
@@ -82,6 +83,15 @@ def test_six_ears_sit_on_the_rings_and_join_them_with_a_hole_for_the_rod():
     assert _volume(e) == pytest.approx(6 * (20 * 14 * 6 - math.pi * (6.5 / 2) ** 2 * 6), rel=1e-6)   # 幅 20、リングをまたぐ 14、穴 φ6.5
     assert not _inside(e, 84, 0, 145) and _inside(e, 78, 0, 145) and _inside(e, 89.5, 0, 145)
     assert not _inside(e, 84 * math.cos(math.pi / 3), 84 * math.sin(math.pi / 3), 145)               # 60° のロッド穴も空き
+
+
+def test_the_ear_hole_is_centred_on_the_rod_radius():
+    """穴 φ6.5（ロッド 5.5 + 逃げ 1）の中心がロッドの半径 84 にある。両側から縁を挟んで確かめる。"""
+    e, rod = ear(SPEC), radii(SPEC).rod
+    assert rod == pytest.approx(84)
+    for side in (1, -1):
+        assert not _inside(e, rod + side * 3.0, 0, 145)                  # 縁（中心から 3.25）の内側は空き
+        assert _inside(e, rod + side * 3.5, 0, 145)                      # 縁の外側は肉
 
 
 def test_the_ears_bridge_the_rings_without_overlapping_them():

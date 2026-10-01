@@ -67,9 +67,23 @@ def test_the_tip_bolts_seat_on_the_underside_with_the_head_below():
     assert b.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((-411.9 - 5, -411.9 + 6))
 
 
+def test_the_tip_bolts_stand_between_the_tubes_on_the_tube_circle():
+    """軸 φ5 の中心は PCD 106.68 の上で、管（0°, 60°, …）から 30° ずれた方位。"""
+    b, r = bolt_tip(SPEC), 53.34
+    for k in range(6):
+        a, t = math.radians(30 + 60 * k), math.radians(60 * k)
+        assert _inside(b, r * math.cos(a), r * math.sin(a), -409), k            # 軸
+        assert not _inside(b, (r + 2.6) * math.cos(a), (r + 2.6) * math.sin(a), -409), k   # 軸の外（半径 2.5）
+        assert not _inside(b, r * math.cos(t), r * math.sin(t), -409), k        # 管の位置には無い
+
+
 def test_the_band_bolts_run_along_y_through_the_tabs():
     b = bolt_band(SPEC)
     box = _box(b)
     assert b.solids().size() == 2
     assert (box.ymin, box.ymax) == pytest.approx((-5.25, 12.75))              # 軸 12（y = 6.75 → −5.25）と頭 6
     assert (box.zmin, box.zmax) == pytest.approx((31.5 - 5, 31.5 + 5))
+    for side in (1, -1):                                                       # 軸 φ6 の中心は耳の中央 x = ±93
+        assert _inside(b, side * 93, 0, 31.5)
+        assert _inside(b, side * (93 + 2.9), 0, 31.5) and _inside(b, side * (93 - 2.9), 0, 31.5)
+        assert not _inside(b, side * (93 + 3.1), 0, 31.5) and not _inside(b, side * (93 - 3.1), 0, 31.5)

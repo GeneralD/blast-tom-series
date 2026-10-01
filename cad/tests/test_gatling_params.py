@@ -1,4 +1,4 @@
-"""Gatling の寸法（仕様 §5.2）と導出値。"""
+"""Gatling の寸法（仕様 §5.2）。導出値は test_gatling_derived.py。"""
 
 from __future__ import annotations
 
@@ -38,8 +38,15 @@ def test_the_sources_follow_the_section_5_2_table():
                          "lug.count", "clamp.mid_position", "clamp.tip_thickness", "clamp.mid_thickness",
                          "header.thickness", "flange.thickness", "flange.bolt_phase", "flange.bolt_seat",
                          "plate.margin", "gasket.thickness", "hoop.gap", "hoop.ear.count", "shell.thickness",
-                         "shell.plenum_height", "edge.angle", "edge.radius", "edge.height", "tuning_target", "finish"}
+                         "shell.plenum_height", "edge.angle", "edge.radius", "edge.height", "tuning_target", "finish",
+                         "band.bar.width", "band.bar.thickness", "band.bolt",
+                         "cradle.bar.width", "cradle.bar.thickness", "cradle.clearance", "cradle.handle_length",
+                         "cradle.pad.width", "cradle.pad.depth", "cradle.pad.thickness",
+                         "flange.bolt_count", "flange.bolt", "clamp.bolt",
+                         "hoop.inner.thickness", "hoop.inner.height", "hoop.outer.thickness", "hoop.outer.height",
+                         "head.f01_range[0]", "head.f01_range[1]"}
     leaves = dict(walk(SPEC))
+    assert settled_by_design <= set(leaves)                  # 綴りの誤りで検査が空振りしない
     assert not (settled_by_design & pending)
     assert all(leaves[p].source is Source.DESIGN for p in settled_by_design)
 

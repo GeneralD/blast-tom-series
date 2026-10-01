@@ -12,6 +12,9 @@ def test_the_screw_table_has_the_sizes_the_spec_uses():
     m6 = SCREWS["M6"]
     assert (float(m6.major), float(m6.tap_drill), float(m6.clearance)) == (6.0, 5.0, 6.6)
     assert (float(m6.head_dia), float(m6.head_height)) == (10.0, 6.0)
+    m5 = SCREWS["M5"]
+    assert (float(m5.major), float(m5.tap_drill), float(m5.clearance)) == (5.0, 4.2, 5.5)
+    assert (float(m5.head_dia), float(m5.head_height)) == (8.5, 5.0)
 
 
 def test_every_table_value_is_a_standard_value_with_a_source():

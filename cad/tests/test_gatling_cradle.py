@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import math
+
 import cadquery as cq
 import pytest
 from gatling.params import SPEC, override
-from gatling.placement import cradle_y_rear
+from gatling.placement import cradle_y_rear, radii
 from gatling.shapes.mount import band, cradle, pad
 
 
@@ -47,6 +49,13 @@ def test_four_legs_and_arms_carry_the_frame_down_to_the_band():
     box = c.val().BoundingBox()
     assert box.zmin == pytest.approx(31.5 - 3)                                    # 腕はバンドの高さ中心（31.5）
     assert _inside(c, 85, 85, 31.5) and _inside(c, -85, 85, 31.5)                 # 腕（隅から胴バンドへ）
+
+
+def test_all_four_arms_reach_the_band_surface():
+    """腕の先端（対角線上、バンド外面 r 83 の 0.3 外）が 4 本とも肉。1 本でも短ければ空く。"""
+    c, reach = cradle(SPEC), radii(SPEC).band_outer + 0.3
+    for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+        assert _inside(c, sx * reach / math.sqrt(2), sy * reach / math.sqrt(2), 31.5), (sx, sy)
 
 
 def test_the_arms_end_on_the_band_surface_without_cutting_into_it():

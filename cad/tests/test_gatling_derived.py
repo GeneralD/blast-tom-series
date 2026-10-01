@@ -6,7 +6,7 @@ import dataclasses
 import math
 
 import pytest
-from drumcad.dims import Choice, Dim, Source, design
+from drumcad.dims import Choice, Dim, Source, as_provisional, design, walk
 from gatling.derived import Derived, derive, derived_from, name
 from gatling.params import SPEC, override
 
@@ -109,3 +109,27 @@ def test_name_is_model_inch_and_lug_count():
     assert name(override(SPEC, lug__count=3)) == "gatling-6-3"
     assert name(override(SPEC, head__fit_id=203.2)) == "gatling-8-6"
     assert name(override(SPEC, tube__count=0)) == "gatling-6-6"     # derive() を通さない（個数で割らない）
+
+
+def _declared(leaf: Dim) -> set[str]:
+    """導出値の注記「…（仮の入力: a, b）」から入力の葉の一覧を読む。"""
+    return set(leaf.note.rsplit("（仮の入力: ", 1)[1].rstrip("）").split(", "))
+
+
+@pytest.mark.parametrize("base", [SPEC, override(SPEC, tube__gap_ratio=0.8)], ids=["default", "wide"])
+def test_every_leaf_that_moves_a_derived_value_is_declared_as_its_input(base):
+    """入力の宣言漏れを機械的に見る。葉を 1 つずつ振り、値が動いた導出値の入力 dict にその葉があること。
+
+    宣言が漏れると、その葉が仮のままでも導出値が確定に化ける。全部の葉を仮にして、注記に全入力を書かせて読む。
+    `plate_od` などの max は効いている項しか動かないので、ボルト円の項が効く既定と、管の項が効く wide の 2 点で振る。
+    """
+    pending = as_provisional(base, "検査用")
+    before = derive(pending)
+    for path, leaf in walk(pending):
+        if not isinstance(leaf, Dim):
+            continue
+        v = float(leaf)
+        moved = derive(override(pending, **{path: v + 1 if v.is_integer() else v * 1.1}))
+        for field in dataclasses.fields(Derived):
+            if float(getattr(moved, field.name)) != pytest.approx(float(getattr(before, field.name))):
+                assert path in _declared(getattr(before, field.name)), (field.name, path)

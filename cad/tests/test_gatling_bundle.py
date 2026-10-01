@@ -32,6 +32,19 @@ def test_the_header_is_a_disc_with_tube_holes_and_m6_tap_drills():
     assert not _inside(h, 53.34, 0, -3) and _inside(h, 0, 0, -3)           # 管の穴は空き、中心は肉
 
 
+def test_the_header_tap_drills_sit_on_the_flange_bolt_circle_between_the_tubes():
+    """M6 の下穴 φ5 は、ボルト円 φ172 の上で管から 30° ずれた方位（D-17）。穴の縁は中心から 2.5。"""
+    h = header(SPEC)
+    for k in range(6):
+        a = math.radians(30 + 60 * k)
+        c, s = math.cos(a), math.sin(a)
+        for r in (86, 86 - 2.4, 86 + 2.4):
+            assert not _inside(h, r * c, r * s, -3), (k, r)                   # 下穴は空き
+        assert _inside(h, (86 - 2.6) * c, (86 - 2.6) * s, -3) and _inside(h, (86 + 2.6) * c, (86 + 2.6) * s, -3)
+        b = math.radians(60 * k)
+        assert _inside(h, 86 * math.cos(b), 86 * math.sin(b), -3)            # 管の方位のボルト円上は肉
+
+
 def test_the_flange_is_an_outward_ring_whose_bore_is_the_shell_bore():
     f = flange(SPEC)
     assert f.solids().size() == 1 and _z(f) == (1, 7)
