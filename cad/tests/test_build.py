@@ -177,7 +177,8 @@ def test_an_exception_during_the_checks_hides_the_previous_output_and_names_the_
         build.build(broken)
     assert not (tmp_path / "demo-6-6-PROVISIONAL").exists()
     assert (tmp_path / "demo-6-6-PROVISIONAL.stale" / "assembly.step").exists()
-    assert "demo" in capsys.readouterr().out
+    # 見出し（stdout）にも機種名は出るので、例外の報告そのもの（stderr）を見る
+    assert "demo: 例外で止まった" in capsys.readouterr().err
 
 
 def test_an_exception_during_the_export_hides_the_previous_output(tmp_path, monkeypatch, demo):
@@ -194,18 +195,18 @@ def test_an_exception_during_the_export_hides_the_previous_output(tmp_path, monk
 
 
 def test_main_goes_on_to_the_next_model_after_one_raises_and_exits_nonzero(monkeypatch, capsys):
-    monkeypatch.setattr(build, "discover", lambda root: {"a": object(), "b": object()})
+    monkeypatch.setattr(build, "discover", lambda root: {"alpha": object(), "beta": object()})
     seen = []
 
     def fake_build(model):
         seen.append(model)
         if len(seen) == 1:
-            raise RuntimeError("a の失敗")
+            raise RuntimeError("alpha の失敗")
         return 0
 
     monkeypatch.setattr(build, "build", fake_build)
     assert build.main(["build.py"]) == 1
     assert len(seen) == 2
     captured = capsys.readouterr()
-    assert "RuntimeError" in captured.err and "a の失敗" in captured.err     # トレースバックは出す
-    assert "a" in captured.err.splitlines()[-1]                              # 最後に失敗した機種を並べる
+    assert "RuntimeError" in captured.err and "alpha の失敗" in captured.err  # トレースバックは出す
+    assert captured.err.splitlines()[-1] == "❌ 例外で作れなかった機種: alpha"    # 最後に失敗した機種を並べる
