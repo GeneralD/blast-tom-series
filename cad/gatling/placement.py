@@ -47,7 +47,12 @@ def lug_angles(spec: GatlingSpec) -> list[float]:
 
 @dataclass(frozen=True)
 class Levels:
-    """z 座標（mm）。上から並べると受金 → フープ → ヘッド → 胴 → フランジ → ヘッダープレート → 管。"""
+    """z 座標（mm）。
+
+    前半（`ear_top` 〜 `tube_tip`）は軸の上に積む部品の高さで、上から順（受金 → フープ → ヘッド → エッジ → 胴 →
+    フランジ → ガスケット → ヘッダープレート → 管とクランプ）。後半（`hoop_bottom` 以降）はフープの下端と、
+    胴の脇に付く部品（ラグ・胴バンド・クレードル・当て板・ホルダー受け）の高さで、上下の順には並べていない。
+    """
 
     ear_top: float            # 受金の上面
     hoop_top: float           # 内外リングの上端（揃える）

@@ -112,7 +112,7 @@ class Flange:
 
 @dataclass(frozen=True)
 class Plate:
-    margin: Dim              # 管外面・ボルト穴から板縁までの片側の縁
+    margin: Dim              # 管外面・ボルトの中心から板縁までの片側の縁（ボルトの中心と管外面の間もこの値以上）
     max_over_shell: Dim      # 板の外径の上限 = 胴外径 + この値
 
 
@@ -148,7 +148,7 @@ class Pad:
 class Cradle:
     bar: Bar
     clearance: Dim           # 胴バンド外面からフレーム内面までの逃げ
-    handle_length: Dim       # 後側の横桟から、グリップの中心まで
+    handle_length: Dim       # 後側の横桟の外面から、グリップの中心まで
     grip_dia: Dim
     pad: Pad
 
@@ -199,7 +199,7 @@ SPEC = GatlingSpec(
         inner=HoopRing(thickness=design(3, "新規設計"), height=design(25, "新規設計")),
         outer=HoopRing(thickness=design(3, "質量リング"), height=design(25, "質量リング")),
         gap=design(8, "ロッドが通る間隔"),
-        seat=design(1.0, "フレッシュフープの上面に掛かる幅（肉厚 1.5 の内側）"),
+        seat=design(1.0, "フレッシュフープの上面に掛かる幅（環の肉厚 head.collar_wall の内側に収める。hoop_seat が見る）"),
         takeup=design(5, "チューニングでヘッドとフープを引き下ろす代"),
         ear=Ear(count=design(6, "ラグ数と同じ"), width=design(20), thickness=design(6),
                 hole_clearance=design(1.0, "ロッド通し穴の逃げ")),

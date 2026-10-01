@@ -13,7 +13,7 @@ from drumcad.dims import Choice, Dim, spec
 
 @dataclass(frozen=True)
 class Screw:
-    """六角穴付きボルト（ISO 4762）と、その下穴・通し穴（ISO 273 中級）。"""
+    """六角穴付きボルト（ISO 4762）と、その下穴（慣用値: 呼び径 − 並目ピッチ）・通し穴（ISO 273 中級）。"""
 
     major: Dim
     tap_drill: Dim
@@ -23,21 +23,21 @@ class Screw:
 
 
 SCREWS: dict[str, Screw] = {
-    "M5": Screw(spec(5.0, "ISO 262"), spec(4.2, "ISO 261 の下穴"), spec(5.5, "ISO 273 中級"),
+    "M5": Screw(spec(5.0, "ISO 262"), spec(4.2, "下穴の慣用値（呼び径 − ピッチ = 5 − 0.8。ピッチは ISO 261 の並目）"), spec(5.5, "ISO 273 中級"),
                 spec(8.5, "ISO 4762"), spec(5.0, "ISO 4762")),
-    "M6": Screw(spec(6.0, "ISO 262"), spec(5.0, "ISO 261 の下穴"), spec(6.6, "ISO 273 中級"),
+    "M6": Screw(spec(6.0, "ISO 262"), spec(5.0, "下穴の慣用値（呼び径 − ピッチ = 6 − 1.0。ピッチは ISO 261 の並目）"), spec(6.6, "ISO 273 中級"),
                 spec(10.0, "ISO 4762"), spec(6.0, "ISO 4762")),
 }
 
 # テンションロッドのねじの呼び径。ラグに合う規格を実物で確かめるまで、ラグ側の `Choice` が仮。
 ROD_THREADS: dict[str, Dim] = {
-    "#12-24": spec(5.5, "ASME B1.1 の #12（0.216 in）"),
+    "#12-24": spec(5.5, "ASME B1.1 の #12（0.216 in ≈ 5.49 mm を 0.1 mm に丸めた）"),
     "M5": spec(5.0, "ISO 262"),
 }
 
 # ホルダー受けが受ける L ロッドの径。
 HOLDER_RODS: dict[str, Dim] = {
-    "L ロッド 10.5": spec(10.5, "ロッド径"),
+    "L ロッド 10.5": spec(10.5, "ロッド径（タムホルダーの L ロッドの慣用径。規格値ではない）"),
     "L ロッド 12.7": spec(12.7, "ロッド径（1/2 インチ）"),
 }
 

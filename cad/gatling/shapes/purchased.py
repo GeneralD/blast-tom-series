@@ -19,6 +19,8 @@ def head(spec: GatlingSpec) -> cq.Workplane:
     胴とエッジ環の外側に垂れる（環の内径 = 胴外径 + 逃げ）。内リングは環の上端に載る。"""
     z, h = levels(spec), spec.head
     collar = ring(radii(spec).collar, float(h.fit_id) / 2, z.collar_bottom, z.head_top)
+    # 膜の縁は環の肉厚の中ほどまで広げる。環の内面（fit_id / 2）で止めると膜と環が面で接するだけになり、
+    # union が 1 つの solid に融合しない（形は位置と大きさの確認用で、実物の膜の巻き込みは表さない）
     film = disc(float(h.fit_id) / 2 + float(h.collar_wall) / 2, z.edge_top, z.head_top)
     return collar.union(film)
 

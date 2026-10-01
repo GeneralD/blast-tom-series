@@ -27,7 +27,7 @@ class PartInfo:
     made: Made                     # fabricated = 製作品、purchased = 既製品の簡略形状
     count: int = 1
     section: Section = "none"      # 2D 図面の切り方（PR 5 で使う）
-    explode: tuple[float, float, float] = (0.0, 0.0, 0.0)   # viewer の分解方向（単位ベクトル）
+    explode: tuple[float, float, float] = (0.0, 0.0, 0.0)   # viewer の分解の方向と相対距離（単位ベクトルではない。長さが分解の距離の比）
     standard: str = ""             # BOM「規格・型番の系統」。製作品の行は機種がここに書く
     dimensions: str = ""           # BOM「寸法」（例: φ38.1 × t1.2 × L450）。同上
 

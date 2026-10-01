@@ -101,7 +101,12 @@ def tubes_apart(spec: GatlingSpec) -> list[Issue]:
 
 
 def plate_size(plate_od: float, shell_id: float, shell_od: float, max_over_shell: float) -> list[Issue]:
-    """ヘッダープレートの外径が胴内径以上（蓋になる）で、胴外径 + 上限以下。"""
+    """ヘッダープレートの外径が胴内径以上（蓋になる）で、胴外径 + 上限以下。
+
+    `issues()` から `derive()` の値で呼ぶと、下限側は常に通る（恒真）: `plate_od` は max の項に胴外径を含み、
+    胴内径 = 胴外径 − 2 × 肉厚（肉厚 > 0 は `structure()` が見る）なので、`plate_od` ≥ 胴外径 > 胴内径。
+    値を直に渡して呼ぶとき（テスト）のために、下限の検査も残す。
+    """
     return (at_least("ヘッダープレートが胴の内径より小さく、蓋にならない", plate_od, shell_id)
             + at_most("ヘッダープレートが大きすぎる（胴外径 + 上限を超える）", plate_od, shell_od + max_over_shell))
 
@@ -126,7 +131,8 @@ def bolt_clearances(spec: GatlingSpec) -> list[Issue]:
              + at_least("ボルト穴と板縁の距離が縁に足りない", to_edge, margin)
              + at_least("ボルトの頭が胴の外面にかかる（ボルト座が頭の半径に足りない）", to_shell, 0.0))
     if not shifted:
-        found.append(Issue(True, f"フランジのボルトが管と同じ方位にある（bolt_phase = {float(spec.flange.bolt_phase):g}° は管の間隔 {pitch:g}° の倍数）"))
+        found.append(Issue(True, f"フランジのボルトのどれかが管と同じ方位にある（bolt_phase = {float(spec.flange.bolt_phase):g}°、"
+                                 f"ボルト {len(bolts)} 本（間隔 {360 / len(bolts):g}°）・管 {len(tubes)} 本（間隔 {pitch:g}°））"))
     return found
 
 
