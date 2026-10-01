@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from gatling.checks import aligned, ear_fits, hoop_seat, lug_fits, rod_fits
+from gatling.checks import aligned, ear_fits, hoop_seat, lug_fits, rod_fits, spacing
 from gatling.params import SPEC, override
 from gatling.placement import levels
 
@@ -95,3 +95,14 @@ def test_an_ear_must_leave_a_wall_on_both_sides_of_the_rod_hole():
     for width in (5, 6.5, 18.4):
         assert any("受金" in w for w in _fatal(ear_fits(override(SPEC, hoop__ear__width=width)))), width
     assert ear_fits(override(SPEC, hoop__ear__width=18.5)) == []
+
+
+def test_too_many_ears_and_lugs_run_into_each_other():
+    """隣り合う矩形は内側の端で先に当たる。幅 ≤ 2 × 内端の半径 × tan(180° / 個数)。
+    受金（幅 20、内端 r 76.7）は 24 個まで、ラグ（幅 16、内端 r 76）は 29 個まで。"""
+    found = _fatal(spacing(override(SPEC, lug__count=30, hoop__ear__count=30)))
+    assert any("受金" in w for w in found) and any("ラグ" in w for w in found), found
+    found = _fatal(spacing(override(SPEC, lug__count=25, hoop__ear__count=25)))
+    assert any("受金" in w for w in found) and not any("ラグ" in w for w in found), found
+    assert spacing(override(SPEC, lug__count=24, hoop__ear__count=24)) == []
+    assert spacing(SPEC) == [] and spacing(override(SPEC, lug__count=2, hoop__ear__count=2)) == []

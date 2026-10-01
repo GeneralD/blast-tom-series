@@ -320,6 +320,25 @@ def hoop_seat(spec: GatlingSpec) -> list[Issue]:
                     float(spec.hoop.seat), float(spec.head.collar_wall))
 
 
+def spacing(spec: GatlingSpec) -> list[Issue]:
+    """周に並ぶ受金・ラグが隣どうしで重ならない（個数の上限）。
+
+    幅 w の矩形を方位の線に沿って並べると、隣り合う 2 つは内側の端（半径 r0）の角で先に当たる。重ならない条件は
+    w ≤ 2 × r0 × tan(180° / 個数)。ロッドの半径での弦長で比べると、内端の角の重なりを見落とす（内端はロッドより内側）。
+    受金の内端は内リングの内面、ラグの内端は胴の外面。2 個以下は向かい合うので重ならない。
+    """
+    r = radii(spec)
+    found = []
+    for what, n, width, r0 in (
+        ("受金", int(float(spec.hoop.ear.count)), float(spec.hoop.ear.width), r.hoop_in_inner),
+        ("ラグ", int(float(spec.lug.count)), 2 * float(spec.lug.standoff), r.shell),
+    ):
+        if n >= 3:
+            found += _at_most(f"{what} {n} 個が隣どうしで重なる（幅 > 2 × 内端の半径 × tan(180° / 個数)）",
+                              width, 2 * r0 * math.tan(math.pi / n))
+    return found
+
+
 def ear_fits(spec: GatlingSpec) -> list[Issue]:
     """受金の幅が、ロッド通し穴の両側に肉を残す（幅 ≥ 穴径 + 2 × 板厚）。幅が穴径以下だと受金が 2 片に割れる。
 
@@ -455,6 +474,6 @@ def issues(spec: GatlingSpec) -> list[Issue]:
     found += plate_size(float(d.plate_od), float(d.shell_id), float(d.shell_od), float(spec.plate.max_over_shell))
     found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec) + tip_bolts_clear(spec)
     found += aligned(int(float(spec.tube.count)), int(float(spec.lug.count)), int(float(spec.hoop.ear.count)))
-    found += rod_fits(spec) + hoop_seat(spec) + ear_fits(spec) + lug_fits(spec) + cradle_fits(spec) + holder_fits(spec) + bolt_lengths(spec)
+    found += rod_fits(spec) + hoop_seat(spec) + ear_fits(spec) + spacing(spec) + lug_fits(spec) + cradle_fits(spec) + holder_fits(spec) + bolt_lengths(spec)
     found += mount_clear(spec)
     return found + stock_warning(spec)
