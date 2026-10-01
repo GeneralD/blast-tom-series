@@ -143,7 +143,15 @@ def as_provisional(obj: Any, note: str) -> Any:
     `Dim` / `Choice` 以外（名前・密度のような素の値・None）はそのまま返す。
     葉を 1 つも含まない dataclass（`Material` など）は**元のオブジェクトのまま**返す —
     同一性（`is`）で材質を見る箇所があるため。
+
+    `init=False` のフィールドは写さない（`replace()` が `__post_init__` で作り直す）。
+    そこに `Dim` / `Choice` があると、導出値の出典が写し先で黙って変わるか消えるので、
+    `TypeError` で止める。
     """
+    return _provisional(obj, note, "")
+
+
+def _provisional(obj: Any, note: str, prefix: str) -> Any:
     if isinstance(obj, Dim):
         tail = f"。元の注記: {obj.note}" if obj.note else ""
         return Dim(float(obj), Source.PROVISIONAL, f"{note}{tail}")
@@ -151,12 +159,22 @@ def as_provisional(obj: Any, note: str) -> Any:
         tail = f"。元の注記: {obj.note}" if obj.note else ""
         return Choice(obj.value, Source.PROVISIONAL, f"{note}{tail}")
     if isinstance(obj, tuple):
-        return tuple(as_provisional(item, note) for item in obj)
+        return tuple(_provisional(item, note, f"{prefix}[{i}]") for i, item in enumerate(obj))
     if isinstance(obj, list):
-        return [as_provisional(item, note) for item in obj]
+        return [_provisional(item, note, f"{prefix}[{i}]") for i, item in enumerate(obj)]
     if not dataclasses.is_dataclass(obj) or isinstance(obj, type):
         return obj
-    copied = {f.name: as_provisional(getattr(obj, f.name), note)
+    dormant = obj.dormant_fields() if hasattr(obj, "dormant_fields") else frozenset()
+    for f in dataclasses.fields(obj):
+        if f.init or f.name in dormant:
+            continue
+        path = f"{prefix}.{f.name}" if prefix else f.name
+        for leaf_path, _ in walk(getattr(obj, f.name), path):
+            raise TypeError(
+                f"{leaf_path}: init=False のフィールドに Dim / Choice がある。as_provisional は "
+                f"init=False のフィールドを写さない（replace() が __post_init__ で作り直す）ので、"
+                f"導出値は init=True の元の値から __post_init__ で作り直すこと")
+    copied = {f.name: _provisional(getattr(obj, f.name), note, f"{prefix}.{f.name}" if prefix else f.name)
               for f in dataclasses.fields(obj) if f.init}
     if all(value is getattr(obj, name) for name, value in copied.items()):
         return obj

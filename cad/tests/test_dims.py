@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import io
 import pickle
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 import pytest
 from drumcad.dims import (Choice, Dim, Source, as_provisional, design, derived, measured,
@@ -252,3 +252,40 @@ def test_override_rejects_an_index_into_something_that_is_not_a_sequence():
 def test_override_rejects_an_unknown_attribute_after_an_index():
     with pytest.raises(AttributeError, match=r"nested\[0\]\.nope"):
         override(_holder(), {"nested[0].nope": 1})
+
+
+# --- as_provisional は init=False の葉を黙って落とさない -----------------------
+
+
+@dataclass(frozen=True)
+class _Derived:
+    base: Dim
+    twice: Dim = field(init=False)
+    label: str = field(init=False, default="導出")
+
+    def __post_init__(self):
+        object.__setattr__(self, "twice", derived(float(self.base) * 2, "base の 2 倍"))
+
+
+def test_as_provisional_rejects_a_leaf_in_an_init_false_field_and_names_its_path():
+    with pytest.raises(TypeError, match=r"twice.*__post_init__"):
+        as_provisional(_Derived(design(3)), "別径から写した")
+
+
+def test_as_provisional_names_the_full_path_of_an_init_false_leaf_nested_in_a_container():
+    @dataclass(frozen=True)
+    class _Outer:
+        items: tuple
+
+    with pytest.raises(TypeError, match=r"items\[1\]\.twice"):
+        as_provisional(_Outer((design(1), _Derived(design(3)))), "x")
+
+
+def test_as_provisional_still_copies_an_init_false_field_without_leaves():
+    @dataclass(frozen=True)
+    class _Plain:
+        base: Dim
+        tag: str = field(init=False, default="固定")
+
+    copied = as_provisional(_Plain(design(3)), "x")
+    assert copied.base.source is Source.PROVISIONAL and copied.tag == "固定"
