@@ -68,3 +68,15 @@ def test_a_lug_on_the_diagonal_that_reaches_down_to_an_arm_is_fatal():
     values = {"lug.count": 8, "hoop.ear.count": 8, "cradle.bar.thickness": 40, "lug.height": 60, "lug.rod_length": 120}
     assert any("ラグ" in w and "腕" in w for w in _fatal(override(SPEC, **values)))
     assert not any("腕" in w for w in _fatal(override(SPEC, **{**values, "lug.height": 52})))     # 下端 52.19 > 腕の上端 51.5
+
+
+@pytest.mark.parametrize("values", [{"band.bar.width": 36}, {"band.above_flange": 23}, {"shell.plenum_height": 76}])
+def test_a_band_tab_that_rises_into_the_frame_is_fatal(values):
+    """耳の外端（バンド外面 83 + 耳の長さ 20 = 103）はフレームの内面 98 より外にある。既定では z が離れている
+    （バンド 19〜44、フレーム 54〜60）だけで、バンドを広げる・上げる、胴を低くしてフレームを下げると当たる。"""
+    assert any("耳" in w and "フレーム" in w for w in _fatal(override(SPEC, **values))), values
+
+
+def test_a_band_tab_inside_the_frame_passes():
+    """逃げ 21 でフレームの内面 104 > 耳の外端 103。"""
+    assert not any("耳" in w for w in _fatal(override(SPEC, cradle__clearance=21, band__bar__width=36)))

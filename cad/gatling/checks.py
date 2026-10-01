@@ -207,6 +207,11 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
             if hit:
                 hits.setdefault(what, []).append(a)
     found += [Issue(True, f"{what}（方位 {', '.join(f'{a:g}°' for a in angles)}）") for what, angles in hits.items()]
+    # 胴バンドの耳（ボルトの頭を含む）とフレーム。耳の外端は既定でもフレームの内面より外にあり、z が離れているだけ
+    tabs, tab_z = _band_tabs(spec)
+    reach = max(max(abs(x), abs(y)) for tab in tabs for x, y in tab)
+    if _z_overlap(*tab_z, z.frame_centre - t / 2, z.frame_top) and reach > r.frame_inner + EPS:
+        found.append(Issue(True, f"胴バンドの耳がクレードルのフレームに当たる（耳の外端 {reach:.2f} > フレームの内面 {r.frame_inner:.2f}、z も重なる）"))
     # グリップ（YZ 面の円）と、当て板・ホルダー受け（YZ 面の矩形）。グリップは X 方向にフレームの幅いっぱい通る
     grip = (grip_y(spec), z.frame_centre)
     grip_r = float(spec.cradle.grip_dia) / 2
@@ -375,23 +380,33 @@ def cradle_fits(spec: GatlingSpec) -> list[Issue]:
     return found + flange_bolts_removable(spec)
 
 
+def _band_tabs(spec: GatlingSpec) -> tuple[list[list[Point]], tuple[float, float]]:
+    """胴バンドの耳の平面形（±X の 2 つ）と z の範囲。ボルトの頭を含む。
+
+    x はバンドの内面から外面 + 耳の長さ、y は −Y 側の耳の外面から +Y 側の耳の外面 + ボルトの頭
+    （締め代の隙間も含めて 1 つの矩形で見る）。z はバンドの高さと、バンドの中心に置いた頭の径の広いほう。
+    ボルトの頭は両側とも +Y 側に出る（180° 回すと y も裏返るので、回さずに x の範囲を反転する）。
+    """
+    z, r, b = levels(spec), radii(spec), spec.band
+    screw = lookup_screw(b.bolt)
+    zc, head = (z.band_bottom + z.band_top) / 2, float(screw.head_dia) / 2
+    near, far = float(b.gap) / 2 + float(b.bar.thickness), float(b.gap) / 2 + float(b.bar.thickness) + float(screw.head_height)
+    reach = r.band_outer + band_tab_length(spec)
+    return ([_rect(r.band_inner, reach, -near, far), _rect(-reach, -r.band_inner, -near, far)],
+            (min(z.band_bottom, zc - head), max(z.band_top, zc + head)))
+
+
 def _above_the_flange(spec: GatlingSpec) -> list[tuple[str, list[Point], float]]:
     """フランジの上にある、胴バンドの環より外の部品の平面形（凸多角形）と下端の z（名前, 多角形, 下端）。
 
-    耳: 分割面の両端、x はバンドの内面から外面 + 耳の長さ、y は −Y 側の耳の外面から +Y 側の耳の外面 + ボルトの頭
-    （締め代の隙間も含めて 1 つの矩形で見る）。腕: 対角線上、バンドの外面から脚の中心まで、幅は平角材の幅。
+    耳: `_band_tabs`。腕: 対角線上、バンドの外面から脚の中心まで、幅は平角材の幅。
     脚: 4 隅の平角材の断面。値は形状（`shapes/mount.py`）と同じ placement から読む。
     """
-    z, r, c, b = levels(spec), radii(spec), spec.cradle, spec.band
-    screw = lookup_screw(b.bolt)
+    z, r, c = levels(spec), radii(spec), spec.cradle
     w, t = float(c.bar.width), float(c.bar.thickness)
     zb = (z.band_bottom + z.band_top) / 2
-    near, far = float(b.gap) / 2 + float(b.bar.thickness), float(b.gap) / 2 + float(b.bar.thickness) + float(screw.head_height)
-    tab_bottom = min(z.band_bottom, zb - float(screw.head_dia) / 2)
-    reach = r.band_outer + band_tab_length(spec)
-    # ±X の両側。ボルトの頭は両側とも +Y 側に出る（180° 回すと y も裏返るので、回さずに x の範囲を反転する）
-    found = [("胴バンドの耳", _rect(r.band_inner, reach, -near, far), tab_bottom),
-             ("胴バンドの耳", _rect(-reach, -r.band_inner, -near, far), tab_bottom)]
+    tabs, (tab_bottom, _) = _band_tabs(spec)
+    found = [("胴バンドの耳", tab, tab_bottom) for tab in tabs]
     found += [("クレードルの腕", _rect(r.band_outer, cradle_corner(spec), -w / 2, w / 2, a), zb - t / 2) for a in (45, 135, 225, 315)]
     k = r.frame_inner + w / 2
     found += [("クレードルの脚", _rect(sx * k - w / 2, sx * k + w / 2, sy * k - t / 2, sy * k + t / 2), zb)

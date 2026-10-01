@@ -33,6 +33,7 @@ THREADED = {frozenset(p) for p in [("band", "bolt_band"), ("bolt_flange", "heade
     {"flange.bolt_seat": 12, "flange.bolt_phase": 5, "band.above_flange": 1},                         # 10. ボルトの頭と耳
     {"flange.bolt_seat": 12, "flange.bolt_phase": 45, "band.bar.width": 10, "band.above_flange": 1},  # 10. ボルトの頭と腕
     {"lug.count": 30, "hoop.ear.count": 30},                                                          # 11. 個数の上限
+    {"band.bar.width": 36}, {"band.above_flange": 23}, {"shell.plenum_height": 76},                   # 12. 胴バンドの耳とフレーム
 ])
 def test_an_override_that_breaks_the_shape_is_fatal(values):
     assert fatal_count(issues(override(SPEC, **values))) >= 1, values
@@ -57,6 +58,7 @@ def _overlaps(spec) -> list[str]:
     {"flange.bolt_seat": 12, "flange.bolt_phase": 33, "band.bar.width": 10, "band.above_flange": 1},  # 10 の内側
     {"hoop.inner.thickness": 0.5, "hoop.seat": 1.5, "lug.standoff": 4.5,                              # 4・5 の内側
      "lug.height": 60, "cradle.clearance": 10.5, "lug.rod_length": 120},
+    {"cradle.clearance": 21, "band.bar.width": 36},                                                   # 12 の内側
 ])
 def test_an_override_just_inside_the_checks_builds_without_any_overlap(values):
     spec = override(SPEC, **values)
