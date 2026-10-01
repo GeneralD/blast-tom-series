@@ -169,3 +169,86 @@ def test_asdict_keeps_every_leaf_value_source_and_note():
     assert d["tube"]["length"] == 450 and d["tube"]["length"].source is Source.PROVISIONAL
     assert d["tube"]["finish"] == s.tube.finish
     assert d["profile"][1][0].source is Source.PROVISIONAL
+
+
+# --- override が walk のパスを受け付ける ------------------------------------
+
+
+@dataclass(frozen=True)
+class _Holder:
+    pts: list
+    ring: tuple
+    nested: tuple
+
+
+def _holder() -> _Holder:
+    return _Holder(
+        pts=[design(1, "点 0"), provisional(2, "点 1")],
+        ring=(Choice("a", Source.DESIGN, "輪 0"), Choice("b", Source.PROVISIONAL)),
+        nested=(_Tube(od=design(10), length=provisional(20), finish=Choice("x", Source.DESIGN)),),
+    )
+
+
+def test_override_accepts_an_index_into_a_tuple_and_keeps_the_container_type():
+    s = _spec()
+    t = override(s, {"profile[1][0]": 9})
+    assert float(t.profile[1][0]) == 9
+    assert t.profile[1][0].source is Source.PROVISIONAL, "出典を継ぐ"
+    assert isinstance(t.profile, tuple) and isinstance(t.profile[1], tuple)
+    assert t.profile[0] == s.profile[0], "ほかの要素は変えない"
+    assert float(s.profile[1][0]) == 3, "元は変えない"
+
+
+def test_override_accepts_an_index_into_a_list_and_keeps_the_container_type():
+    h = _holder()
+    t = override(h, {"pts[1]": 5})
+    assert isinstance(t.pts, list) and t.pts is not h.pts
+    assert float(t.pts[1]) == 5 and t.pts[1].note == "点 1"
+    assert float(h.pts[1]) == 2, "元の list は変えない"
+
+
+def test_override_accepts_a_path_that_goes_through_an_index_into_a_dataclass():
+    t = override(_holder(), {"nested[0].length": 99})
+    assert float(t.nested[0].length) == 99 and t.nested[0].length.source is Source.PROVISIONAL
+
+
+def test_override_replaces_a_choice_inside_a_tuple():
+    t = override(_holder(), {"ring[0]": "z"})
+    assert t.ring[0].value == "z" and t.ring[0].note == "輪 0"
+
+
+def test_override_applies_several_indexed_paths_into_the_same_container():
+    t = override(_holder(), {"pts[0]": 7, "pts[1]": 8})
+    assert [float(p) for p in t.pts] == [7, 8]
+
+
+def _leaf_at(obj, path):
+    return dict(walk(obj))[path]
+
+
+@pytest.mark.parametrize("root", [_spec, _holder])
+def test_override_round_trips_every_path_walk_emits(root):
+    s = root()
+    for path, leaf in walk(s):
+        new = "ZZ" if isinstance(leaf, Choice) else float(leaf) + 1000
+        t = override(s, {path: new})
+        changed = [p for p, _ in walk(t) if _leaf_at(t, p) != _leaf_at(s, p)]
+        assert changed == [path], path
+        got = _leaf_at(t, path)
+        assert (got.value if isinstance(got, Choice) else float(got)) == new
+        assert (got.source, got.note) == (leaf.source, leaf.note)
+
+
+def test_override_rejects_an_index_out_of_range():
+    with pytest.raises(IndexError, match=r"profile\[5\]"):
+        override(_spec(), {"profile[5][0]": 1})
+
+
+def test_override_rejects_an_index_into_something_that_is_not_a_sequence():
+    with pytest.raises(AttributeError, match=r"lugs\[0\]"):
+        override(_spec(), {"lugs[0]": 1})
+
+
+def test_override_rejects_an_unknown_attribute_after_an_index():
+    with pytest.raises(AttributeError, match=r"nested\[0\]\.nope"):
+        override(_holder(), {"nested[0].nope": 1})

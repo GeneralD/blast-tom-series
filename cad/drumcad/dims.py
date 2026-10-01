@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 from enum import Enum
 from typing import Any, Iterator
 
@@ -163,7 +164,10 @@ def as_provisional(obj: Any, note: str) -> Any:
 
 
 def override(obj: Any, values: dict[str, Any]) -> Any:
-    """`"tube.length": 500` のような属性パスで葉を差し替えた新しい spec を返す。
+    """`"tube.length": 500` や `"profile[1][0]": 3` のようなパスで葉を差し替えた新しい spec を返す。
+
+    パスは `walk()` が出す形（属性は `.`、タプル／リストの添字は `[i]`）をそのまま受ける。
+    添字を通ったコンテナは同じ型（tuple は tuple、list は list）で作り直し、元は変えない。
 
     sweep（仕様 §5.5）が使う。差し替えた葉は**元の出典と注記を継ぐ** — sweep は
     「同じ出典のまま値だけ振る」操作で、値を変えたからといって仮になる
@@ -171,21 +175,49 @@ def override(obj: Any, values: dict[str, Any]) -> Any:
     """
     result = obj
     for path, value in values.items():
-        result = _override_one(result, path.split("."), path, value)
+        result = _override_one(result, _parse_path(path), path, value)
     return result
 
 
-def _override_one(obj: Any, keys: list[str], full: str, value: Any) -> Any:
+_PATH_TOKEN = re.compile(r"\[(\d+)\]|\.?([^.\[\]]+)")
+
+
+def _parse_path(path: str) -> list[str | int]:
+    """`"a.b[2].c"` を `["a", "b", 2, "c"]` に割る。属性名は str、添字は int。"""
+    tokens: list[str | int] = []
+    pos = 0
+    for m in _PATH_TOKEN.finditer(path):
+        if m.start() != pos:
+            break
+        pos = m.end()
+        tokens.append(int(m.group(1)) if m.group(1) is not None else m.group(2))
+    if pos != len(path) or not tokens:
+        raise AttributeError(f"{path}: パスの書式が読めない")
+    return tokens
+
+
+def _override_one(obj: Any, keys: list[str | int], full: str, value: Any) -> Any:
     head, rest = keys[0], keys[1:]
-    if not dataclasses.is_dataclass(obj) or not hasattr(obj, head):
+    if isinstance(head, int):
+        if not isinstance(obj, (tuple, list)):
+            raise AttributeError(f"{full}: [{head}] は tuple / list の添字にしか使えない")
+        if head >= len(obj):
+            raise IndexError(f"{full}: 添字 {head} が範囲外（長さ {len(obj)}）")
+        items = list(obj)
+        items[head] = _override_leaf(obj[head], rest, full, value)
+        return tuple(items) if isinstance(obj, tuple) else items
+    if not dataclasses.is_dataclass(obj) or isinstance(obj, type) or not hasattr(obj, head):
         raise AttributeError(f"{full}: そのパスは spec に無い")
-    current = getattr(obj, head)
-    if rest:
-        new = _override_one(current, rest, full, value)
-    elif isinstance(current, Dim):
-        new = Dim(float(value), current.source, current.note)
-    elif isinstance(current, Choice):
-        new = Choice(str(value), current.source, current.note)
-    else:
-        raise AttributeError(f"{full}: Dim でも Choice でもない")
+    new = _override_leaf(getattr(obj, head), rest, full, value)
     return dataclasses.replace(obj, **{head: new})
+
+
+def _override_leaf(current: Any, rest: list[str | int], full: str, value: Any) -> Any:
+    """`current` の下の `rest` を差し替える。`rest` が空なら `current` 自身が葉。"""
+    if rest:
+        return _override_one(current, rest, full, value)
+    if isinstance(current, Dim):
+        return Dim(float(value), current.source, current.note)
+    if isinstance(current, Choice):
+        return Choice(str(value), current.source, current.note)
+    raise AttributeError(f"{full}: Dim でも Choice でもない")
