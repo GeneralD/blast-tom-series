@@ -5,7 +5,8 @@ from __future__ import annotations
 import cadquery as cq
 import pytest
 from gatling.params import SPEC, override
-from gatling.shapes.mount import band, cradle, cradle_y_rear, pad
+from gatling.placement import cradle_y_rear
+from gatling.shapes.mount import band, cradle, pad
 
 
 def _inside(part, x, y, z):

@@ -5,7 +5,8 @@ from __future__ import annotations
 import cadquery as cq
 import pytest
 from gatling.params import SPEC
-from gatling.shapes.mount import BAND_SPLIT, band, band_bolt_x, band_tab_length
+from gatling.placement import band_bolt_x, band_tab_length
+from gatling.shapes.mount import BAND_SPLIT, band
 
 
 def _inside(part, x, y, z):
