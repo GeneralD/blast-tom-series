@@ -58,12 +58,20 @@ def structure(spec: GatlingSpec) -> list[Issue]:
     for path, table in _TABLES.items():
         if leaves[path].value not in table:
             found.append(Issue(True, f"{path} = {leaves[path].value!r} は規格表（{', '.join(table)}）に無い"))
-    found += [Issue(True, f"{p} = {float(leaves[p]):g} は正でなければならない") for p in _POSITIVE if float(leaves[p]) <= 0]
-    found += [Issue(True, f"{p} = {float(leaves[p]):g} は 0 以上でなければならない") for p in _NON_NEGATIVE if float(leaves[p]) < 0]
-    t, e = spec.tube, spec.edge
+    found += [Issue(True, f"{p} = {float(leaves[p]):g} は正でなければならない")
+              for p in _POSITIVE if not math.isfinite(float(leaves[p])) or float(leaves[p]) <= 0]
+    found += [Issue(True, f"{p} = {float(leaves[p]):g} は 0 以上でなければならない")
+              for p in _NON_NEGATIVE if not math.isfinite(float(leaves[p])) or float(leaves[p]) < 0]
+    t, e, h = spec.tube, spec.edge, spec.head
     if float(t.thickness) * 2 >= float(t.od):
         found.append(Issue(True, f"管の肉厚 {float(t.thickness):g} が外径 {float(t.od):g} の半分以上で、穴が無い"))
-    flat = float(e.width) - float(e.radius)          # 頂部の面取りの内側に残る 45° 面の水平幅
-    if not 0 < float(e.angle) < 90 or flat <= 0 or flat * math.tan(math.radians(float(e.angle))) >= float(e.height):
-        found.append(Issue(True, "ベアリングエッジの形が成り立たない（角度は 0〜90°、幅 > R、面の落ち < 高さ）"))
+    shell_od = float(h.fit_id) - float(h.fit_clearance)   # derive() と同じ式（derive() はここでは呼ばない）
+    if 2 * float(spec.shell.thickness) >= shell_od:
+        found.append(Issue(True, f"胴の肉厚 {float(spec.shell.thickness):g} が胴外径 {shell_od:g} の半分以上で、穴が無い"))
+    if float(e.width) >= shell_od / 2:
+        found.append(Issue(True, f"エッジ環の幅 {float(e.width):g} が胴の半径 {shell_od / 2:g} 以上で、内径が残らない"))
+    flat = float(e.width) - float(e.radius)          # 頂部の面取りの内側に残るエッジ面の水平幅
+    if (not 0 < float(e.angle) < 90 or flat <= 0 or float(e.radius) >= float(e.height)
+            or flat * math.tan(math.radians(float(e.angle))) >= float(e.height)):
+        found.append(Issue(True, "ベアリングエッジの形が成り立たない（角度は 0〜90°、幅 > R、R < 高さ、面の落ち < 高さ）"))
     return found

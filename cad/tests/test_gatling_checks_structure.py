@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from gatling.checks import structure
+from drumcad.dims import Dim, walk
+from gatling.checks import _COUNTS, _NON_NEGATIVE, _POSITIVE, structure
 from gatling.params import SPEC, override
 
 
@@ -51,9 +52,44 @@ def test_a_tube_wall_that_leaves_no_bore_is_fatal():
     assert any("肉厚" in w for w in _fatal(override(SPEC, tube__thickness=19.05)))
 
 
-@pytest.mark.parametrize("path, value", [("edge.angle", 90), ("edge.angle", 0), ("edge.radius", 4), ("edge.height", 2)])
-def test_a_bearing_edge_that_cannot_be_cut_is_fatal(path, value):
-    assert any("ベアリングエッジ" in w for w in _fatal(override(SPEC, **{path: value}))), (path, value)
+@pytest.mark.parametrize("changes", [
+    {"edge.angle": 90}, {"edge.angle": 0}, {"edge.radius": 4}, {"edge.height": 2},
+    {"edge.radius": 10, "edge.width": 12},   # 面の幅は残るが、R が高さ以上で面取りが収まらない
+])
+def test_a_bearing_edge_that_cannot_be_cut_is_fatal(changes):
+    assert any("ベアリングエッジ" in w for w in _fatal(override(SPEC, **changes))), changes
+
+
+def test_a_shell_wall_that_leaves_no_bore_is_fatal():
+    assert any("胴" in w and "穴" in w for w in _fatal(override(SPEC, shell__thickness=80)))
+
+
+def test_a_bearing_edge_wider_than_the_shell_radius_is_fatal():
+    assert any("エッジ環" in w for w in _fatal(override(SPEC, edge__width=80, edge__angle=5)))
+
+
+def test_a_nan_dimension_is_fatal():
+    nan = float("nan")
+    found = _fatal(override(SPEC, tube__length=nan, header__hole_clearance=nan))
+    assert any("tube.length" in w for w in found), found
+    assert any("header.hole_clearance" in w for w in found), found
+
+
+# 正・0 以上・個数のどれでもない数値の葉。新しい葉が分類されずに入るのを防ぐため、ここに理由つきで列挙する。
+_UNCHECKED = {
+    "head.f01_range[0]", "head.f01_range[1]",   # 周波数の目標範囲。形状に入らず、音の検査（PR 4）が見る
+    "head.loss_factor",                         # 膜の損失係数。形状に入らない
+    "tube.gap_ratio", "tube.protrusion_ratio",  # od に掛ける比。寸法ではなく、符号の決まりは配置の側にある
+    "clamp.mid_position",                       # 管長に対する比（0〜1）。寸法ではない
+    "flange.bolt_phase",                        # 位相（度）。負でも 360 超でも形は作れる
+}
+
+
+def test_every_numeric_leaf_is_classified():
+    numeric = {path for path, leaf in walk(SPEC) if isinstance(leaf, Dim)}
+    classified = set(_COUNTS) | set(_POSITIVE) | set(_NON_NEGATIVE) | _UNCHECKED
+    assert numeric - classified == set()
+    assert classified - numeric == set()   # 一覧に古い名前が残っていない
 
 
 def test_every_problem_is_reported_not_just_the_first():
