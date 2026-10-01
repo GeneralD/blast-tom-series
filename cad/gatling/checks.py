@@ -41,6 +41,14 @@ _NON_NEGATIVE = (
     "head.fit_clearance", "hoop.ear.hole_clearance", "header.hole_clearance",
     "tube.trim_allowance", "band.rubber", "band.above_flange", "plate.max_over_shell",
 )
+# 符号は問わないが有限であること。inf / nan は三角関数や配置の計算を割る（`bolt_phase = inf` で `cos` が ValueError）。
+_FINITE = (
+    "head.f01_range[0]", "head.f01_range[1]",   # 周波数の目標範囲。形状に入らず、音の検査（PR 4）が見る
+    "head.loss_factor",                         # 膜の損失係数。形状に入らない
+    "tube.gap_ratio", "tube.protrusion_ratio",  # od に掛ける比。符号の決まりは配置の検査（tubes_apart・tube_clamps）が見る
+    "clamp.mid_position",                       # 管長に対する比。0〜1 は tube_clamps が見る
+    "flange.bolt_phase",                        # 位相（度）。負でも 360 超でも形は作れる
+)
 # Choice → 引く表。表に無い呼びは形が作れない。
 _TABLES = {"flange.bolt": SCREWS, "clamp.bolt": SCREWS, "band.bolt": SCREWS, "lug.thread": ROD_THREADS, "mount.type": HOLDER_RODS}
 
@@ -62,6 +70,8 @@ def structure(spec: GatlingSpec) -> list[Issue]:
               for p in _POSITIVE if not math.isfinite(float(leaves[p])) or float(leaves[p]) <= 0]
     found += [Issue(True, f"{p} = {float(leaves[p]):g} は 0 以上でなければならない")
               for p in _NON_NEGATIVE if not math.isfinite(float(leaves[p])) or float(leaves[p]) < 0]
+    found += [Issue(True, f"{p} = {float(leaves[p]):g} は有限でなければならない")
+              for p in _FINITE if not math.isfinite(float(leaves[p]))]
     t, e, h = spec.tube, spec.edge, spec.head
     if float(t.thickness) * 2 >= float(t.od):
         found.append(Issue(True, f"管の肉厚 {float(t.thickness):g} が外径 {float(t.od):g} の半分以上で、穴が無い"))
@@ -225,9 +235,16 @@ def bolt_lengths(spec: GatlingSpec) -> list[Issue]:
     found += _at_most("先端クランプのボルトが板を突き抜ける", float(c.bolt_length), float(c.tip_thickness))
     found += _at_least("先端クランプのボルトのねじ込みが短い", float(c.bolt_length), MIN_ENGAGEMENT * major(c.bolt), fatal=False)
     # 胴バンドのボルトは、+Y 側の耳・分割面の締め代・−Y 側の耳（タップ）の順に通る
+    found += _at_least("胴バンドのボルトが −Y 側の耳に届かない（+Y 側の耳 + 締め代）", float(b.bolt_length),
+                       float(b.bar.thickness) + float(b.gap))
     found += _at_most("胴バンドのボルトが耳を突き抜ける", float(b.bolt_length), 2 * float(b.bar.thickness) + float(b.gap))
     found += _at_least("胴バンドのボルトのねじ込みが短い", float(b.bolt_length) - float(b.bar.thickness) - float(b.gap),
                        MIN_ENGAGEMENT * major(b.bolt), fatal=False)
+    # 耳（x ≥ バンド内面、分割面から gap/2 の所）が半環の肉に重なるのは、y = gap/2 で環の外面が x > 内半径まで
+    # 来るとき（(gap/2)² < 外半径² − 内半径²）。重ならないと耳が半環から離れた別の solid になる
+    r = radii(spec)
+    found += _at_most("胴バンドの締め代が広すぎて、耳が半環から離れる（締め代の半分）", float(b.gap) / 2,
+                      math.sqrt(r.band_outer ** 2 - r.band_inner ** 2) - EPS)
     return found
 
 

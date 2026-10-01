@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from gatling.checks import MIN_CRADLE_CLEARANCE, bolt_lengths, cradle_fits, holder_fits, stock_warning
 from gatling.params import SPEC, override
 
@@ -69,6 +70,23 @@ def test_a_shallow_thread_engagement_is_a_warning():
 def test_the_tip_and_band_bolts_must_not_poke_through():
     assert any("先端クランプ" in w and "突き抜け" in w for w in _fatal(bolt_lengths(override(SPEC, clamp__bolt_length=7))))
     assert any("胴バンド" in w and "突き抜け" in w for w in _fatal(bolt_lengths(override(SPEC, band__bolt_length=14))))   # 耳 6 + 締め代 1.5 + 耳 6 = 13.5 まで
+
+
+@pytest.mark.parametrize("values", [{"band.gap": 200}, {"band.gap": 7}, {"band.bolt_length": 5}])
+def test_a_band_bolt_that_does_not_reach_the_far_tab_is_fatal(values):
+    """+Y 側の耳 6 と締め代を渡りきらないと、−Y 側の耳のタップに入らない（フランジのボルトと同じ扱い）。"""
+    assert any("胴バンド" in w and "届かない" in w for w in _fatal(bolt_lengths(override(SPEC, **values)))), values
+
+
+def test_a_band_bolt_that_just_reaches_the_far_tab_is_only_a_warning():
+    found = bolt_lengths(override(SPEC, band__gap=6))                     # 12 = 耳 6 + 締め代 6: 届くがねじ込み 0
+    assert _fatal(found) == [] and any("胴バンド" in w and "ねじ込み" in w for w in _warn(found))
+
+
+def test_a_band_gap_so_wide_that_the_tabs_leave_the_half_rings_is_fatal():
+    """耳（x ≥ バンド内面）が半環の肉に重なるのは、分割面からの距離 gap/2 が √(外半径² − 内半径²) 未満のとき（√(83² − 77²) ≈ 31.0）。"""
+    assert any("耳" in w and "離れる" in w for w in _fatal(bolt_lengths(override(SPEC, band__gap=62.5, band__bolt_length=70))))
+    assert not any("離れる" in w for w in _fatal(bolt_lengths(override(SPEC, band__gap=61, band__bolt_length=70))))
 
 
 def test_the_band_bolt_engagement_counts_the_gap_between_the_tabs():

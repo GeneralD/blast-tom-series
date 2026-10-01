@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from drumcad.dims import Dim, walk
-from gatling.checks import _COUNTS, _NON_NEGATIVE, _POSITIVE, structure
+from gatling.checks import _COUNTS, _FINITE, _NON_NEGATIVE, _POSITIVE, issues, structure
 from gatling.params import SPEC, override
 
 
@@ -75,21 +75,25 @@ def test_a_nan_dimension_is_fatal():
     assert any("header.hole_clearance" in w for w in found), found
 
 
-# 正・0 以上・個数のどれでもない数値の葉。新しい葉が分類されずに入るのを防ぐため、ここに理由つきで列挙する。
-_UNCHECKED = {
-    "head.f01_range[0]", "head.f01_range[1]",   # 周波数の目標範囲。形状に入らず、音の検査（PR 4）が見る
-    "head.loss_factor",                         # 膜の損失係数。形状に入らない
-    "tube.gap_ratio", "tube.protrusion_ratio",  # od に掛ける比。寸法ではなく、符号の決まりは配置の側にある
-    "clamp.mid_position",                       # 管長に対する比（0〜1）。寸法ではない
-    "flange.bolt_phase",                        # 位相（度）。負でも 360 超でも形は作れる
-}
+@pytest.mark.parametrize("path", sorted(_FINITE))
+def test_a_signed_leaf_may_be_negative_but_must_be_finite(path):
+    for bad in (float("inf"), float("-inf"), float("nan")):
+        assert any(path in w and "有限" in w for w in _fatal(override(SPEC, **{path: bad}))), (path, bad)
+
+
+def test_an_infinite_phase_is_reported_instead_of_raising():
+    found = [i.what for i in issues(override(SPEC, flange__bolt_phase=float("inf"))) if i.fatal]
+    assert any("flange.bolt_phase" in w for w in found), found
 
 
 def test_every_numeric_leaf_is_classified():
+    """正・0 以上・個数・有限（符号は問わない）のどれかに入る。新しい葉が分類されずに入るのを防ぐ。"""
     numeric = {path for path, leaf in walk(SPEC) if isinstance(leaf, Dim)}
-    classified = set(_COUNTS) | set(_POSITIVE) | set(_NON_NEGATIVE) | _UNCHECKED
+    groups = [set(_COUNTS), set(_POSITIVE), set(_NON_NEGATIVE), set(_FINITE)]
+    classified = set().union(*groups)
     assert numeric - classified == set()
     assert classified - numeric == set()   # 一覧に古い名前が残っていない
+    assert sum(len(g) for g in groups) == len(classified)   # 2 つの分類に重ねて入れない
 
 
 def test_every_problem_is_reported_not_just_the_first():
