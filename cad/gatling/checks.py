@@ -16,7 +16,8 @@ from drumcad.stock import nearest
 from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_rod, lookup_screw
 from .derived import derive
 from .params import GatlingSpec
-from .placement import flange_bolt_points, levels, radii, tube_points
+from .placement import (cradle_y_rear, flange_bolt_points, grip_y, levels, lug_angles, lug_box, radii,
+                        tube_points)
 
 EPS = 1e-6                    # 縁ちょうどの値が浮動小数の誤差で fatal にならないように
 MIN_ENGAGEMENT = 0.75         # ねじ込み長 / 呼び径の下限（下回ると警告）
@@ -94,6 +95,115 @@ def _at_least(what: str, value: float, floor: float, fatal: bool = True) -> list
 
 def _at_most(what: str, value: float, ceiling: float, fatal: bool = True) -> list[Issue]:
     return [] if value <= ceiling + EPS else [Issue(fatal, f"{what}（{value:.2f} > {ceiling:.2f}）")]
+
+
+# ---- 平面の幾何。形状を作らずに、形状と同じ placement の値から重なりを見る ----
+
+Point = tuple[float, float]
+
+
+def _rect(u0: float, u1: float, v0: float, v1: float, angle_deg: float = 0.0) -> list[Point]:
+    """局所座標の矩形 u∈[u0, u1]、v∈[v0, v1] を Z 軸周りに `angle_deg` 回した 4 隅（反時計回り）。
+
+    x = u cos a − v sin a、y = u sin a + v cos a。形状の `rotate((0,0,0), (0,0,1), a)` と同じ向き。
+    """
+    c, s = math.cos(math.radians(angle_deg)), math.sin(math.radians(angle_deg))
+    return [(u * c - v * s, u * s + v * c) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
+
+
+def _edges(poly: list[Point]) -> list[tuple[Point, Point]]:
+    return [(poly[i], poly[(i + 1) % len(poly)]) for i in range(len(poly))]
+
+
+def _polygons_overlap(p: list[Point], q: list[Point]) -> bool:
+    """2 つの凸多角形が EPS を超えて重なる（分離軸判定。接するだけなら重ならない）。"""
+    for (x0, y0), (x1, y1) in _edges(p) + _edges(q):
+        nx, ny = y0 - y1, x1 - x0
+        norm = math.hypot(nx, ny)
+        a = [(x * nx + y * ny) / norm for x, y in p]
+        b = [(x * nx + y * ny) / norm for x, y in q]
+        if min(max(a), max(b)) - max(min(a), min(b)) <= EPS:
+            return False
+    return True
+
+
+def _segment_distance(p: Point, a: Point, b: Point) -> float:
+    ax, ay, bx, by = *a, *b
+    dx, dy = bx - ax, by - ay
+    t = max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(p[0] - ax - t * dx, p[1] - ay - t * dy)
+
+
+def _circle_overlaps(centre: Point, radius: float, poly: list[Point]) -> bool:
+    """円と凸多角形（反時計回り）が EPS を超えて重なる。中心が内側にあるか、辺までの距離が半径未満。"""
+    inside = all((b[0] - a[0]) * (centre[1] - a[1]) - (b[1] - a[1]) * (centre[0] - a[0]) >= 0 for a, b in _edges(poly))
+    return inside or min(_segment_distance(centre, a, b) for a, b in _edges(poly)) < radius - EPS
+
+
+def _z_overlap(a0: float, a1: float, b0: float, b1: float) -> bool:
+    return min(a1, b1) - max(a0, b0) > EPS
+
+
+def _round_parts(spec: GatlingSpec) -> list[tuple[str, float, float, float]]:
+    """胴まわりの回転体の外半径と z の範囲（名前, 外半径, 下端, 上端）。平面視ではこの半径の円の内側を占めるとみなす。"""
+    z, r = levels(spec), radii(spec)
+    return [
+        ("胴・エッジ環", r.shell, z.flange_top, z.edge_top),
+        ("フレッシュフープ", r.collar, z.collar_bottom, z.head_top),
+        ("内リング", r.hoop_in_outer, z.head_top, z.hoop_top),
+        ("外リング", r.hoop_out_outer, z.hoop_top - float(spec.hoop.outer.height), z.hoop_top),
+        ("胴バンド", r.band_outer, z.band_bottom, z.band_top),
+        ("フランジ・ヘッダープレート", float(derive(spec).plate_od) / 2, z.header_bottom, z.flange_top),
+    ]
+
+
+def _origin_distance(poly: list[Point]) -> float:
+    """原点（胴の軸）から凸多角形までの距離。原点が内側なら 0。"""
+    return 0.0 if _circle_overlaps((0.0, 0.0), 0.0, poly) else min(_segment_distance((0.0, 0.0), a, b) for a, b in _edges(poly))
+
+
+def mount_clear(spec: GatlingSpec) -> list[Issue]:
+    """ホルダー受け・当て板・グリップが、胴まわりの部品とラグ・ロッドに食い込まない。
+
+    z の範囲が重なり、かつ平面視でも重なれば干渉（fatal）。平面視の形は形状と同じ placement の値から作る:
+    ホルダー受けは中心 (0, `cradle_y_rear`)・半径 body_dia/2 の円、当て板は同じ中心の軸平行な矩形、ラグは
+    `lug_box` を `lug_angles` の方位へ回した矩形、ロッドは半径 `rod` の円周上の円。胴まわりの回転体は
+    外半径の円で見る（中は空いていても、外から来る部品は外面で当たる）。グリップは X 方向の丸棒なので、
+    YZ 面の円（中心 (`grip_y`, frame_centre)、半径 grip_dia/2）と、当て板・ホルダー受けの YZ 面の矩形で見る。
+    """
+    z, r, m, p = levels(spec), radii(spec), spec.mount, spec.cradle.pad
+    y0, rb = cradle_y_rear(spec), float(m.body_dia) / 2
+    pw, pd = float(p.width), float(p.depth)
+    pad = _rect(-pw / 2, pw / 2, y0 - pd / 2, y0 + pd / 2)
+    holder_z, pad_z = (z.holder_bottom, z.holder_top), (z.frame_top, z.pad_top)
+    found = []
+    for name, radius, z0, z1 in _round_parts(spec):
+        if _z_overlap(z0, z1, *holder_z) and abs(y0) - rb < radius - EPS:
+            found.append(Issue(True, f"ホルダー受けが{name}に食い込む（平面視で内縁 {abs(y0) - rb:.2f} < 外半径 {radius:.2f}、z も重なる）"))
+        if _z_overlap(z0, z1, *pad_z) and _origin_distance(pad) < radius - EPS:
+            found.append(Issue(True, f"当て板が{name}に食い込む（平面視で内縁 {_origin_distance(pad):.2f} < 外半径 {radius:.2f}、z も重なる）"))
+    box, rod_r = lug_box(spec), float(lookup_rod(spec.lug.thread)) / 2
+    lug_z, rod_z = (z.lug_bottom, z.lug_top), (z.lug_bottom, z.lug_bottom + float(spec.lug.rod_length))
+    hits: dict[str, list[float]] = {}
+    for a in lug_angles(spec):
+        lug = _rect(*box, a)
+        rod = (r.rod * math.cos(math.radians(a)), r.rod * math.sin(math.radians(a)))
+        for what, hit in (
+            ("ラグがホルダー受け", _z_overlap(*lug_z, *holder_z) and _circle_overlaps((0.0, y0), rb, lug)),
+            ("ラグが当て板", _z_overlap(*lug_z, *pad_z) and _polygons_overlap(lug, pad)),
+            ("ロッドがホルダー受け", _z_overlap(*rod_z, *holder_z) and math.dist(rod, (0.0, y0)) < rb + rod_r - EPS),
+            ("ロッドが当て板", _z_overlap(*rod_z, *pad_z) and _circle_overlaps(rod, rod_r, pad)),
+        ):
+            if hit:
+                hits.setdefault(what, []).append(a)
+    found += [Issue(True, f"{what}に当たる（方位 {', '.join(f'{a:g}°' for a in angles)}）") for what, angles in hits.items()]
+    # グリップ（YZ 面の円）と、当て板・ホルダー受け（YZ 面の矩形）。グリップは X 方向にフレームの幅いっぱい通る
+    grip = (grip_y(spec), z.frame_centre)
+    grip_r = float(spec.cradle.grip_dia) / 2
+    for what, (ya, yb), (za, zb) in (("当て板", (y0 - pd / 2, y0 + pd / 2), pad_z), ("ホルダー受け", (y0 - rb, y0 + rb), holder_z)):
+        if _circle_overlaps(grip, grip_r, _rect(ya, yb, za, zb)):
+            found.append(Issue(True, f"ハンドルのグリップが{what}に食い込む（cradle.handle_length = {float(spec.cradle.handle_length):g} が短い）"))
+    return found
 
 
 def tubes_apart(spec: GatlingSpec) -> list[Issue]:
@@ -265,4 +375,5 @@ def issues(spec: GatlingSpec) -> list[Issue]:
     found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec)
     found += aligned(int(float(spec.tube.count)), int(float(spec.lug.count)), int(float(spec.hoop.ear.count)))
     found += rod_fits(spec) + hoop_seat(spec) + lug_fits(spec) + cradle_fits(spec) + holder_fits(spec) + bolt_lengths(spec)
+    found += mount_clear(spec)
     return found + stock_warning(spec)

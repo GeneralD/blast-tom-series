@@ -13,6 +13,7 @@ import math
 from dataclasses import dataclass
 
 from .derived import MIL, derive
+from .fasteners import lookup_screw
 from .params import GatlingSpec
 
 
@@ -68,6 +69,10 @@ class Levels:
     band_bottom: float
     band_top: float
     frame_centre: float       # クレードルの水平フレームの厚みの中心
+    frame_top: float          # フレームの上面（= 当て板の下面）
+    pad_top: float            # 当て板の上面（= ホルダー受けの下面）
+    holder_bottom: float
+    holder_top: float
 
 
 def levels(spec: GatlingSpec) -> Levels:
@@ -85,6 +90,9 @@ def levels(spec: GatlingSpec) -> Levels:
     mid_top = -float(c.mid_position) * length
     tip_bottom = -length + float(t.protrusion_ratio) * float(t.od)
     band_bottom = flange_top + float(spec.band.above_flange)
+    frame_centre = flange_top + float(spec.shell.plenum_height) / 2
+    frame_top = frame_centre + float(spec.cradle.bar.thickness) / 2
+    pad_top = frame_top + float(spec.cradle.pad.thickness)
     return Levels(
         ear_top=hoop_top + float(spec.hoop.ear.thickness), hoop_top=hoop_top,
         head_top=head_top, edge_top=edge_top, collar_bottom=collar_bottom, shell_top=shell_top, flange_top=flange_top,
@@ -93,7 +101,8 @@ def levels(spec: GatlingSpec) -> Levels:
         tip_top=tip_bottom + float(c.tip_thickness), tip_bottom=tip_bottom, tube_tip=-length,
         hoop_bottom=hoop_bottom, lug_top=lug_top, lug_bottom=lug_top - float(spec.lug.height),
         band_bottom=band_bottom, band_top=band_bottom + float(spec.band.bar.width),
-        frame_centre=flange_top + float(spec.shell.plenum_height) / 2,
+        frame_centre=frame_centre, frame_top=frame_top, pad_top=pad_top,
+        holder_bottom=pad_top, holder_top=pad_top + float(spec.mount.body_height),
     )
 
 
@@ -102,6 +111,7 @@ class Radii:
     """半径（mm）。"""
 
     shell: float
+    collar: float             # フレッシュフープの外面（ヘッド外径の半分）
     rod: float                # ロッド（ラグのねじ）の中心
     hoop_in_inner: float
     hoop_in_outer: float
@@ -121,8 +131,43 @@ def radii(spec: GatlingSpec) -> Radii:
     band_inner = shell + float(spec.band.rubber)
     band_outer = band_inner + float(spec.band.bar.thickness)
     return Radii(
-        shell=shell, rod=shell + float(spec.lug.standoff),
+        shell=shell, collar=float(d.head_od) / 2, rod=shell + float(spec.lug.standoff),
         hoop_in_inner=hoop_in_inner, hoop_in_outer=hoop_in_outer,
         hoop_out_inner=hoop_out_inner, hoop_out_outer=hoop_out_inner + float(spec.hoop.outer.thickness),
         band_inner=band_inner, band_outer=band_outer, frame_inner=band_outer + float(spec.cradle.clearance),
     )
+
+
+def lug_box(spec: GatlingSpec) -> tuple[float, float, float, float]:
+    """ラグの箱の平面形（ラグの局所座標）。u は胴の中心からラグの方位へ、v はそれに直交（反時計回りが正）。
+
+    (u0, u1, v0, v1) = (胴外面, 胴外面 + 2 × standoff, −standoff, standoff)。ロッドは箱の中心（u = `rod`）を通る。
+    方位 a のラグの平面座標は x = u cos a − v sin a、y = u sin a + v cos a（`lug_angles` の向き）。
+    """
+    shell, stand = float(derive(spec).shell_od) / 2, float(spec.lug.standoff)
+    return shell, shell + 2 * stand, -stand, stand
+
+
+def band_tab_length(spec: GatlingSpec) -> float:
+    """胴バンドの耳（締め付け部）の長さ。ボルトの頭が収まるよう、頭径の 2 倍にする。"""
+    return 2 * float(lookup_screw(spec.band.bolt).head_dia)
+
+
+def band_bolt_x(spec: GatlingSpec) -> float:
+    """胴バンドのボルトの X 位置（耳の中央、+X 側。−X 側は符号を反転）。"""
+    return radii(spec).band_outer + band_tab_length(spec) / 2
+
+
+def cradle_y_rear(spec: GatlingSpec) -> float:
+    """クレードルの後側の横桟の中心の Y 位置（ヘッドの手前を +Y、後ろを −Y とする）。当て板とホルダー受けの中心もここ。"""
+    return -(radii(spec).frame_inner + float(spec.cradle.bar.width) / 2)
+
+
+def grip_y(spec: GatlingSpec) -> float:
+    """ハンドルのグリップ（X 方向の丸棒）の中心の Y 位置。フレームの外面から `handle_length` 後ろ。"""
+    return -(radii(spec).frame_inner + float(spec.cradle.bar.width)) - float(spec.cradle.handle_length)
+
+
+def cradle_corner(spec: GatlingSpec) -> float:
+    """クレードルの脚（4 隅）の中心までの、胴の中心からの距離。腕はここから対角線に沿って胴バンドの外面まで伸びる。"""
+    return (radii(spec).frame_inner + float(spec.cradle.bar.width) / 2) * math.sqrt(2)

@@ -8,20 +8,13 @@ import cadquery as cq
 
 from ..fasteners import lookup_screw
 from ..params import GatlingSpec
-from ..placement import levels, radii
+from ..placement import band_bolt_x, band_tab_length, cradle_corner, cradle_y_rear, grip_y, levels, radii
 from .common import compound, cylinder, ring
 
 BAND_SPLIT = 2     # 胴バンドは 2 分割
 
 
-def band_tab_length(spec: GatlingSpec) -> float:
-    """バンドの耳（締め付け部）の長さ。ボルトの頭が収まるよう、頭径の 2 倍にする。"""
-    return 2 * float(lookup_screw(spec.band.bolt).head_dia)
-
-
-def band_bolt_x(spec: GatlingSpec) -> float:
-    """バンドのボルトの X 位置（耳の中央、+X 側。−X 側は符号を反転）。"""
-    return radii(spec).band_outer + band_tab_length(spec) / 2
+__all__ = ["BAND_SPLIT", "CRADLE_ARMS", "band", "band_bolt_x", "band_tab_length", "cradle", "cradle_y_rear", "pad"]
 
 
 def band(spec: GatlingSpec) -> cq.Workplane:
@@ -58,11 +51,6 @@ def band(spec: GatlingSpec) -> cq.Workplane:
 CRADLE_ARMS = 4    # 4 隅の腕。先端は胴バンドに M6 で留める（溶接しない。部品表の行だけで形は持たない）
 
 
-def cradle_y_rear(spec: GatlingSpec) -> float:
-    """後側の横桟の中心の Y 位置（ヘッドの手前を +Y、後ろを −Y とする）。"""
-    return -(radii(spec).frame_inner + float(spec.cradle.bar.width) / 2)
-
-
 def cradle(spec: GatlingSpec) -> cq.Workplane:
     """クレードル。胴を囲む水平の矩形フレーム、4 隅から胴バンドへ降りる脚と腕、後端のハンドル。
 
@@ -78,7 +66,7 @@ def cradle(spec: GatlingSpec) -> cq.Workplane:
     w, t, a = float(c.bar.width), float(c.bar.thickness), r.frame_inner
     outer, zf = a + w, z.frame_centre
     zb = (z.band_bottom + z.band_top) / 2
-    grip_y = -outer - float(c.handle_length)
+    gy = grip_y(spec)
 
     def box(sx: float, sy: float, sz: float, at: tuple[float, float, float]) -> cq.Workplane:
         return cq.Workplane("XY").box(sx, sy, sz).translate(at)
@@ -86,9 +74,9 @@ def cradle(spec: GatlingSpec) -> cq.Workplane:
     body = box(2 * outer, w, t, (0, a + w / 2, zf))                                     # 前の横桟
     body = body.union(box(2 * outer, w, t, (0, -(a + w / 2), zf)))                      # 後の横桟
     for sx in (1, -1):
-        body = body.union(box(w, outer - grip_y, t, (sx * (a + w / 2), (outer + grip_y) / 2, zf)))   # 縦桟（後ろへ延長）
-    body = body.union(cylinder((-outer, grip_y, zf), (1, 0, 0), float(c.grip_dia), 2 * outer))        # グリップ
-    corner = (a + w / 2) * math.sqrt(2)
+        body = body.union(box(w, outer - gy, t, (sx * (a + w / 2), (outer + gy) / 2, zf)))   # 縦桟（後ろへ延長）
+    body = body.union(cylinder((-outer, gy, zf), (1, 0, 0), float(c.grip_dia), 2 * outer))        # グリップ
+    corner = cradle_corner(spec)
     leg_top = zf - t / 2
     for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
         body = body.union(box(w, t, leg_top - zb, (sx * (a + w / 2), sy * (a + w / 2), (leg_top + zb) / 2)))   # 脚
@@ -100,6 +88,5 @@ def cradle(spec: GatlingSpec) -> cq.Workplane:
 def pad(spec: GatlingSpec) -> cq.Workplane:
     """当て板。後側の横桟の上面中央に溶接し、ホルダー受けを固定する。"""
     z, p = levels(spec), spec.cradle.pad
-    top = z.frame_centre + float(spec.cradle.bar.thickness) / 2
-    return (cq.Workplane("XY").box(float(p.width), float(p.depth), float(p.thickness))
-            .translate((0, cradle_y_rear(spec), top + float(p.thickness) / 2)))
+    return (cq.Workplane("XY").box(float(p.width), float(p.depth), z.pad_top - z.frame_top)
+            .translate((0, cradle_y_rear(spec), (z.frame_top + z.pad_top) / 2)))

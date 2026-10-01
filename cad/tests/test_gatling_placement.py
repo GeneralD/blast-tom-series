@@ -111,3 +111,14 @@ def test_the_radii_nest_from_the_shell_out_to_the_frame():
     assert r.hoop_in_outer < r.rod < r.hoop_out_inner                                  # ロッドはリングの間
     assert 152.4 / 2 < r.hoop_in_inner < 155.4 / 2                                     # 内リングはフレッシュフープの環の上に載る
     assert (r.band_inner, r.band_outer, r.frame_inner) == pytest.approx((77, 83, 98))
+
+
+def test_the_pad_and_the_holder_stack_on_the_frame():
+    """当て板とホルダー受けの高さは placement に置き、形状と検査が同じ値を読む。"""
+    z = levels(SPEC)
+    assert z.frame_top == pytest.approx(57 + 3) and z.pad_top == pytest.approx(66)
+    assert (z.holder_bottom, z.holder_top) == pytest.approx((66, 96))
+
+
+def test_the_collar_radius_is_half_the_head_diameter():
+    assert radii(SPEC).collar == pytest.approx(152.4 / 2 + 1.5)
