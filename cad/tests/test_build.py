@@ -57,6 +57,45 @@ def test_successful_export_replaces_the_directory_wholesale(tmp_path, demo):
         assert (out / f).exists(), f
 
 
+def test_a_failed_swap_puts_the_previous_output_back(tmp_path, monkeypatch, demo):
+    out = tmp_path / "demo-6-6-PROVISIONAL"
+    out.mkdir()
+    (out / "shell.step").write_text("前回の成果物", encoding="utf-8")
+    real = Path.rename
+
+    def flaky(self, target):
+        if self.name.endswith(".staging"):
+            raise OSError("差し替え中の失敗")
+        return real(self, target)
+
+    monkeypatch.setattr(Path, "rename", flaky)
+    with pytest.raises(OSError):
+        build._export_all(demo, out)
+    assert (out / "shell.step").read_text(encoding="utf-8") == "前回の成果物"
+    assert not (tmp_path / "demo-6-6-PROVISIONAL.stale").exists()
+    assert not (tmp_path / "demo-6-6-PROVISIONAL.staging").exists()
+
+
+def test_the_previous_output_is_set_aside_while_swapping_and_dropped_after(tmp_path, monkeypatch, demo):
+    out = tmp_path / "demo-6-6-PROVISIONAL"
+    out.mkdir()
+    (out / "shell.step").write_text("前回の成果物", encoding="utf-8")
+    seen = []
+    real = Path.rename
+
+    def spy(self, target):
+        if self.name.endswith(".staging"):
+            seen.append((tmp_path / "demo-6-6-PROVISIONAL.stale" / "shell.step").read_text(encoding="utf-8"))
+            assert not out.exists()
+        return real(self, target)
+
+    monkeypatch.setattr(Path, "rename", spy)
+    build._export_all(demo, out)
+    assert seen == ["前回の成果物"]          # staging を置く瞬間、古い方は .stale に残っている
+    assert not (tmp_path / "demo-6-6-PROVISIONAL.stale").exists()
+    assert (out / "assembly.step").exists()
+
+
 def _solids(step: Path) -> int:
     return cq.importers.importStep(str(step)).solids().size()
 

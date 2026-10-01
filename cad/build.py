@@ -79,9 +79,18 @@ def _export_all(model: Model, out_dir: Path) -> None:
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
-    staging.rename(out_dir)
+    # 古い出力は消さずに退避し、置き換えが済んでから捨てる。rmtree してから rename だと、
+    # その間に落ちたとき新旧どちらも手元に残らない（仕様 §4.1: 古い出力は `.stale/` へ退避）
+    backup = _quarantine(out_dir) if out_dir.exists() else None
+    try:
+        staging.rename(out_dir)
+    except BaseException:
+        if backup is not None:
+            backup.rename(out_dir)
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    if backup is not None:
+        shutil.rmtree(backup)
 
 
 def build(model: Model) -> int:
