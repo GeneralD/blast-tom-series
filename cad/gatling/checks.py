@@ -86,15 +86,25 @@ def _at_most(what: str, value: float, ceiling: float, fatal: bool = True) -> lis
     return [] if value <= ceiling + EPS else [Issue(fatal, f"{what}（{value:.2f} > {ceiling:.2f}）")]
 
 
-def tubes_apart(gap_ratio: float) -> list[Issue]:
-    """管同士が干渉しない（隙間比 > 0）。"""
-    return [] if gap_ratio > 0 else [Issue(True, f"管同士が干渉する（tube.gap_ratio = {gap_ratio:g} は正でなければならない）")]
+def tubes_apart(spec: GatlingSpec) -> list[Issue]:
+    """隣り合う管穴の間に肉が残る（管の中心間 − (管外径 + 穴の逃げ) > 0）。中心間は形状と同じ derive の値。"""
+    pitch = float(derive(spec).tube_pitch)
+    hole = float(spec.tube.od) + float(spec.header.hole_clearance)
+    web = pitch - hole
+    return [] if web > 0 else [Issue(True, f"管同士が干渉する（管の中心間 {pitch:.2f} − 穴径 {hole:.2f} = {web:.2f} は正でなければならない。"
+                                           f"tube.gap_ratio = {float(spec.tube.gap_ratio):g}）")]
 
 
 def plate_size(plate_od: float, shell_id: float, shell_od: float, max_over_shell: float) -> list[Issue]:
     """ヘッダープレートの外径が胴内径以上（蓋になる）で、胴外径 + 上限以下。"""
     return (_at_least("ヘッダープレートが胴の内径より小さく、蓋にならない", plate_od, shell_id)
             + _at_most("ヘッダープレートが大きすぎる（胴外径 + 上限を超える）", plate_od, shell_od + max_over_shell))
+
+
+def _angle_apart(a: float, b: float) -> float:
+    """2 つの方位（rad）の差。2π で折り返した最小値。"""
+    diff = (a - b) % (2 * math.pi)
+    return min(diff, 2 * math.pi - diff)
 
 
 def bolt_clearances(spec: GatlingSpec) -> list[Issue]:
@@ -106,7 +116,7 @@ def bolt_clearances(spec: GatlingSpec) -> list[Issue]:
     to_edge = float(d.plate_od) / 2 - float(d.bolt_circle) / 2
     to_shell = float(spec.flange.bolt_seat) - float(screw.head_dia) / 2
     pitch = 360.0 / float(spec.tube.count)
-    shifted = abs(((float(spec.flange.bolt_phase) + pitch / 2) % pitch) - pitch / 2) > EPS
+    shifted = min(_angle_apart(math.atan2(by, bx), math.atan2(ty, tx)) for bx, by in bolts for tx, ty in tubes) > EPS
     found = (_at_least("ボルト穴と管外面の距離が縁に足りない", to_tube, margin)
              + _at_least("ボルト穴と板縁の距離が縁に足りない", to_edge, margin)
              + _at_least("ボルトの頭が胴の外面にかかる（ボルト座が頭の半径に足りない）", to_shell, 0.0))

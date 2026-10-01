@@ -16,13 +16,19 @@ def _warn(issues):
 
 
 def test_the_default_bundle_passes_every_check_with_no_warning():
-    for found in (tubes_apart(0.4), plate_size(188, 149.6, 152, 60), bolt_clearances(SPEC), tubes_inside_bore(SPEC), tube_clamps(SPEC)):
+    for found in (tubes_apart(SPEC), plate_size(188, 149.6, 152, 60), bolt_clearances(SPEC), tubes_inside_bore(SPEC), tube_clamps(SPEC)):
         assert found == []
 
 
 @pytest.mark.parametrize("ratio", [0, -0.1])
 def test_tubes_that_touch_or_overlap_are_fatal(ratio):
-    assert "干渉" in _fatal(tubes_apart(ratio))[0]
+    assert "干渉" in _fatal(tubes_apart(override(SPEC, tube__gap_ratio=ratio)))[0]
+
+
+def test_tubes_whose_holes_overlap_through_the_clearance_are_fatal():
+    """隙間 0.003 × 38.1 ≈ 0.11 は穴の逃げ 0.2 より狭く、隣の管穴が重なって肉が無くなる。"""
+    assert "干渉" in _fatal(tubes_apart(override(SPEC, tube__gap_ratio=0.003)))[0]
+    assert _fatal(tubes_apart(override(SPEC, tube__gap_ratio=0.01))) == []
 
 
 def test_a_plate_smaller_than_the_shell_bore_does_not_close_it():
@@ -66,6 +72,17 @@ def test_a_bolt_whose_head_overlaps_the_shell_wall_is_fatal():
 @pytest.mark.parametrize("phase", [0, 60, 120, -60])
 def test_a_bolt_on_a_tube_bearing_is_fatal(phase):
     assert any("同じ方位" in w for w in _fatal(bolt_clearances(override(SPEC, flange__bolt_phase=phase))))
+
+
+@pytest.mark.parametrize("change", [dict(flange__bolt_count=4), dict(flange__bolt_count=12), dict(tube__count=8)])
+def test_a_bolt_on_a_tube_bearing_is_fatal_when_the_counts_differ(change):
+    """ボルト 0 番だけでなく全組を比べる（4 本なら 120°、12 本なら 0°、管 8 本なら 90° で一致する）。"""
+    assert any("同じ方位" in w for w in _fatal(bolt_clearances(override(SPEC, **change))))
+
+
+def test_eight_tubes_put_a_flange_bolt_into_a_tube():
+    """管 8 本・ボルト 6 本・位相 30° では、90° のボルトが管に重なる。"""
+    assert any("管外面" in w for w in _fatal(bolt_clearances(override(SPEC, tube__count=8))))
 
 
 @pytest.mark.parametrize("phase", [30, 90, 30.0 + 360])
