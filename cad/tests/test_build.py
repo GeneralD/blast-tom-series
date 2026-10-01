@@ -9,6 +9,7 @@ from __future__ import annotations
 import dataclasses
 from pathlib import Path
 
+import cadquery as cq
 import pytest
 
 import build
@@ -51,9 +52,22 @@ def test_successful_export_replaces_the_directory_wholesale(tmp_path, demo):
     (out / "leftover-x8.dxf").write_text("取り残し", encoding="utf-8")
     build._export_all(demo, out)
     assert not (out / "leftover-x8.dxf").exists()
-    for f in ("shell.step", "shell.stl", "shell.svg", "plate.step",
+    for f in ("shell.step", "shell.stl", "shell.svg", "plate.step", "stud.step",
               "assembly.step", "assembly.stl", "assembly.svg", "viewer.html", "bom.md"):
         assert (out / f).exists(), f
+
+
+def _solids(step: Path) -> int:
+    return cq.importers.importStep(str(step)).solids().size()
+
+
+def test_assembly_outputs_every_placed_solid_not_only_the_first_of_each_part(tmp_path, demo):
+    out = tmp_path / "demo-6-6-PROVISIONAL"
+    build._export_all(demo, out)
+    placed = {n: p.solids().size() for n, p in demo.assembly().items()}
+    assert placed["stud"] == 3
+    assert _solids(out / "assembly.step") == sum(placed.values())
+    assert _solids(out / "stud.step") == 3
 
 
 def test_build_uses_the_provisional_suffix_while_any_leaf_is_unsettled(tmp_path, demo):

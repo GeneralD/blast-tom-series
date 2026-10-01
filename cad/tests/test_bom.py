@@ -11,11 +11,11 @@ def test_full_bom_adds_a_row_per_fabricated_part_with_its_mass():
     m = discover(TESTS)["demo"]
     rows = full_bom(m)
     names = [r.name for r in rows]
-    assert names == ["胴", "底板", "ラグ"]
+    assert names == ["胴", "底板", "スタッド", "ラグ"]
     shell = rows[0]
     assert shell.made == "fabricated" and shell.material.name.startswith("ステンレス")
     assert shell.mass_g == pytest.approx(3.14159 * (76.2**2 - 75.0**2) * 100 * 7.93e-3, rel=1e-3)
-    assert rows[2].part_number == "DWSM2200"
+    assert rows[3].part_number == "DWSM2200"
 
 
 def test_bom_markdown_is_a_table_with_a_total_mass():

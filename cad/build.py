@@ -68,7 +68,7 @@ def _export_all(model: Model, out_dir: Path) -> None:
         infos = {p.name: p for p in model.parts()}
         for name, part in parts.items():
             _export_part(part, staging, name)
-        combined = cq.Workplane(obj=cq.Compound.makeCompound([p.val() for p in parts.values()]))
+        combined = cq.Workplane(obj=cq.Compound.makeCompound([s for p in parts.values() for s in p.solids().vals()]))
         exporters.export(combined, str(staging / "assembly.step"))
         exporters.export(combined, str(staging / "assembly.stl"), tolerance=0.05, angularTolerance=0.2)
         exporters.export(combined, str(staging / "assembly.svg"), opt={**_SVG, "width": 1100, "height": 800})

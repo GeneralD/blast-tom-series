@@ -56,13 +56,18 @@ def assembly(spec: DemoSpec) -> dict[str, cq.Workplane]:
     shell = cq.Workplane("XY").circle(r).circle(r - t).extrude(h)
     plate = (cq.Workplane("XY").circle(float(spec.plate.od) / 2)
              .extrude(float(spec.plate.thickness)).translate((0, 0, -float(spec.plate.thickness))))
-    return {"shell": shell, "plate": plate}
+    # 同じ形を 3 個、組立座標系の別々の位置に置く（員数 > 1 の部品の例）。
+    # eachpoint は置いた個数ぶんの solid を Workplane に積む（`val()` は先頭の 1 個しか返さない）
+    studs = (cq.Workplane("XY").pushPoints([(r + 10, 0), (-(r + 10), 0), (0, r + 10)])
+             .eachpoint(lambda loc: cq.Solid.makeCylinder(4, h).moved(loc)))
+    return {"shell": shell, "plate": plate, "stud": studs}
 
 
 def parts(spec: DemoSpec) -> list[PartInfo]:
     return [
         PartInfo("shell", "胴", "#c9ced6", SUS304, "fabricated", 1, "radial", (0, 0, 1)),
         PartInfo("plate", "底板", "#8f99a6", SUS304, "fabricated", 1, "outline", (0, 0, -1)),
+        PartInfo("stud", "スタッド", "#b0b6c0", SUS304, "fabricated", 3, "none", (1, 0, 0)),
     ]
 
 

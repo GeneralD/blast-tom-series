@@ -13,8 +13,8 @@ def test_discover_finds_the_demo_package_and_reads_its_contract():
     m = models["demo"]
     assert isinstance(m, Model)
     assert m.name() == "demo-6-6"
-    assert set(m.assembly()) == {"shell", "plate"}
-    assert [p.name for p in m.parts()] == ["shell", "plate"]
+    assert set(m.assembly()) == {"shell", "plate", "stud"}
+    assert [p.name for p in m.parts()] == ["shell", "plate", "stud"]
 
 
 def test_discover_ignores_directories_that_are_not_model_packages():
