@@ -44,3 +44,13 @@ def test_bom_markdown_is_a_table_with_a_total_mass():
     assert "| 胴 | 製作品 | ステンレス SUS304 |" in md
     assert "| ラグ | 既製品 |" in md and "DWSM2200" in md
     assert "合計質量" in md
+
+
+@pytest.mark.parametrize("override, expected", [
+    ({"shell__height": 120}, "φ152.4 × t1.2 × L120"),
+    ({"shell__od": 127}, "φ127 × t1.2 × L100"),
+    ({"shell__thickness": 1.5}, "φ152.4 × t1.5 × L100"),
+])
+def test_the_shell_row_follows_an_overridden_dimension(override, expected):
+    rows = {r.name: r for r in full_bom(discover(TESTS)["demo"].override(**override))}
+    assert rows["胴"].dimensions == expected

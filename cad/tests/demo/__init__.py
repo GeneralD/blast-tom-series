@@ -64,9 +64,10 @@ def assembly(spec: DemoSpec) -> dict[str, cq.Workplane]:
 
 
 def parts(spec: DemoSpec) -> list[PartInfo]:
+    sh = spec.shell
     return [
         PartInfo("shell", "胴", "#c9ced6", SUS304, "fabricated", 1, "radial", (0, 0, 1),
-                 standard="手すり用 #400 研磨管", dimensions="φ152.4 × t1.2 × L100"),
+                 standard="手すり用 #400 研磨管", dimensions=f"φ{float(sh.od):g} × t{float(sh.thickness):g} × L{float(sh.height):g}"),
         PartInfo("plate", "底板", "#8f99a6", SUS304, "fabricated", 1, "outline", (0, 0, -1)),
         PartInfo("stud", "スタッド", "#b0b6c0", SUS304, "fabricated", 3, "none", (1, 0, 0)),
     ]
