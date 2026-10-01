@@ -1,6 +1,6 @@
 """部品どうしの干渉の検査。形状を作らずに、形状と同じ placement の値から平面形と z の範囲を作って重なりを見る。
 
-`mount_clear` はホルダー受け・当て板・グリップ・ラグ・ロッド・胴バンドの耳とクレードルの重なり、
+`mount_clear` はホルダー受け・当て板・グリップ・ラグ・ロッド・胴バンドの耳とクレードルの重なり（ラグと耳の重なりも）、
 `flange_bolts_removable` は胴バンドとクレードルを付けたままフランジのボルトを抜けるかを見る。
 `issues()`（`checks.py`）から呼ぶ。ここでも形状は作らず、例外も投げない。
 """
@@ -62,6 +62,7 @@ def _arms(spec: GatlingSpec) -> list[list[Point]]:
 
 def mount_clear(spec: GatlingSpec) -> list[Issue]:
     """ホルダー受け・当て板・グリップ・胴バンドの耳が、胴まわりの部品・ラグ・ロッド・クレードルに食い込まない。
+    ラグは胴バンドの耳（`_band_tabs`。ボルトの頭を含む）にも当たらない。
 
     z の範囲が重なり、かつ平面視でも重なれば干渉（fatal）。平面視の形は形状と同じ placement の値から作る:
     ホルダー受けは中心 (0, `cradle_y_rear`)・半径 body_dia/2 の円、当て板は同じ中心の軸平行な矩形、ラグは
@@ -91,6 +92,9 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
     t = float(spec.cradle.bar.thickness)
     frame_z, arm_z = (z.frame_centre - t / 2, z.frame_top), (z.band_centre - t / 2, z.band_centre + t / 2)
     arms = _arms(spec)
+    # 胴バンドの耳（ボルトの頭を含む）。バンドの幅が頭径より狭いと、頭がバンドの上端より上に出るので、
+    # `lug_fits` のラグ下端とバンド上端の比較だけでは止まらない
+    tabs, tab_z = _band_tabs(spec)
     hits: dict[str, list[float]] = {}
     for a in lug_angles(spec):
         lug = rect(*box, a)
@@ -101,12 +105,12 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
             ("ロッドが当て板に当たる", z_overlap(*rod_z, *pad_z) and circle_overlaps(rod, rod_r, pad)),
             ("ラグがクレードルのフレームの内面から外に出て当たる", z_overlap(*lug_z, *frame_z) and square_reach([lug]) > r.frame_inner + EPS),
             ("ラグがクレードルの腕に当たる", z_overlap(*lug_z, *arm_z) and any(polygons_overlap(lug, arm) for arm in arms)),
+            ("ラグが胴バンドの耳（ボルトの頭を含む）に当たる", z_overlap(*lug_z, *tab_z) and any(polygons_overlap(lug, tab) for tab in tabs)),
         ):
             if hit:
                 hits.setdefault(what, []).append(a)
     found += [Issue(True, f"{what}（方位 {', '.join(f'{a:g}°' for a in angles)}）") for what, angles in hits.items()]
     # 胴バンドの耳（ボルトの頭を含む）とフレーム。耳の外端は既定でもフレームの内面より外にあり、z が離れているだけ
-    tabs, tab_z = _band_tabs(spec)
     if z_overlap(*tab_z, *frame_z) and square_reach(tabs) > r.frame_inner + EPS:
         found.append(Issue(True, f"胴バンドの耳がクレードルのフレームに当たる（耳の外端 {square_reach(tabs):.2f} > "
                                  f"フレームの内面 {r.frame_inner:.2f}、z も重なる）"))
