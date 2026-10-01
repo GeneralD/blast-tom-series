@@ -184,3 +184,68 @@ def lug_fits(spec: GatlingSpec) -> list[Issue]:
             + _at_least("ラグの取付穴がラグの高さから下に外れる", zc - half, z.lug_bottom)
             + _at_most("ラグの取付穴がラグの高さから上に外れる", zc + half, z.lug_top)
             + _at_least("ラグが胴バンドに重なる（ラグ下端とバンド上端の距離）", z.lug_bottom, z.band_top))
+
+
+def cradle_fits(spec: GatlingSpec) -> list[Issue]:
+    """クレードルとフープの逃げ（負なら fatal、小さければ警告）、脚の高さ、バンドの下でフランジのボルトを抜けること。"""
+    z, r, c = levels(spec), radii(spec), spec.cradle
+    clearance = r.frame_inner - r.hoop_out_outer
+    found = _at_least("クレードルがフープの外径と干渉する（フレーム内面と外リング外面の逃げ）", clearance, 0.0)
+    if not found:
+        found = _at_least("クレードルとフープの逃げが小さい", clearance, MIN_CRADLE_CLEARANCE, fatal=False)
+    leg = z.frame_centre - float(c.bar.thickness) / 2 - (z.band_bottom + z.band_top) / 2
+    found += _at_least("クレードルの脚の高さが無い（フレームがバンドより上になければならない）", leg, EPS)
+    # 平面視で頭が胴バンドの下に入るなら、ボルトを抜くには頭をねじ込み長ぶん持ち上げる空きが要る。
+    # 頭の高さだけを見ると、締めた状態は当たらなくても、バンド（とクレードル）を外さないと管束を外せない
+    screw = lookup_screw(spec.flange.bolt)
+    head_inner = float(derive(spec).bolt_circle) / 2 - float(screw.head_dia) / 2
+    if head_inner < r.band_outer - EPS:
+        engagement = float(spec.flange.bolt_length) - float(spec.flange.thickness) - float(spec.gasket.thickness)
+        found += _at_least("胴バンドの下でフランジのボルトを抜けない（バンド下端とフランジ上面の距離 < 頭の高さ + ねじ込み長）",
+                           z.band_bottom - z.flange_top, float(screw.head_height) + engagement)
+    return found
+
+
+def holder_fits(spec: GatlingSpec) -> list[Issue]:
+    """ホルダー受けの本体が L ロッド穴の両側に縁（`plate.margin`）を残せる太さで、当て板に載る。"""
+    m, p = spec.mount, spec.cradle.pad
+    return (_at_least("ホルダー受けの本体が L ロッド穴 + 両側の縁に足りない", float(m.body_dia),
+                      float(lookup_holder(m.type)) + 2 * float(spec.plate.margin))
+            + _at_most("ホルダー受けが当て板からはみ出す", float(m.body_dia), min(float(p.width), float(p.depth))))
+
+
+def bolt_lengths(spec: GatlingSpec) -> list[Issue]:
+    """ボルトの長さ: ヘッダー・先端クランプ・バンドの耳を突き抜けない。ねじ込みが短ければ警告。"""
+    f, c, b = spec.flange, spec.clamp, spec.band
+    stack = float(f.thickness) + float(spec.gasket.thickness)
+    major = lambda choice: float(lookup_screw(choice).major)
+    found = _at_least("フランジのボルトがヘッダープレートに届かない", float(f.bolt_length), stack)
+    found += _at_most("フランジのボルトがヘッダープレートを突き抜ける", float(f.bolt_length), stack + float(spec.header.thickness))
+    found += _at_least("フランジのボルトのねじ込みが短い", float(f.bolt_length) - stack, MIN_ENGAGEMENT * major(f.bolt), fatal=False)
+    found += _at_most("先端クランプのボルトが板を突き抜ける", float(c.bolt_length), float(c.tip_thickness))
+    found += _at_least("先端クランプのボルトのねじ込みが短い", float(c.bolt_length), MIN_ENGAGEMENT * major(c.bolt), fatal=False)
+    # 胴バンドのボルトは、+Y 側の耳・分割面の締め代・−Y 側の耳（タップ）の順に通る
+    found += _at_most("胴バンドのボルトが耳を突き抜ける", float(b.bolt_length), 2 * float(b.bar.thickness) + float(b.gap))
+    found += _at_least("胴バンドのボルトのねじ込みが短い", float(b.bolt_length) - float(b.bar.thickness) - float(b.gap),
+                       MIN_ENGAGEMENT * major(b.bolt), fatal=False)
+    return found
+
+
+def stock_warning(spec: GatlingSpec) -> list[Issue]:
+    """管の外径・肉厚が規格からずれていれば警告（`stock.nearest`）。"""
+    _, issue = nearest(float(spec.tube.od), float(spec.tube.thickness))
+    return [issue] if issue else []
+
+
+def issues(spec: GatlingSpec) -> list[Issue]:
+    """整合性チェック。fatal が無ければ出力できる。構造の検査に落ちたら、そこで返す。"""
+    found = structure(spec)
+    if found:
+        return found
+    d = derive(spec)
+    found += tubes_apart(spec)
+    found += plate_size(float(d.plate_od), float(d.shell_id), float(d.shell_od), float(spec.plate.max_over_shell))
+    found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec)
+    found += aligned(int(float(spec.tube.count)), int(float(spec.lug.count)), int(float(spec.hoop.ear.count)))
+    found += rod_fits(spec) + hoop_seat(spec) + lug_fits(spec) + cradle_fits(spec) + holder_fits(spec) + bolt_lengths(spec)
+    return found + stock_warning(spec)
