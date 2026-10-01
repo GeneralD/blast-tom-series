@@ -1945,7 +1945,7 @@ import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-TERMS = ("kitano", "北野", "testimony", "本人談", "明細書", "実用新案")
+TERMS = (...)  # 固有語の一覧はテストファイル本体にだけ書く（この計画書には写さない）
 _SELF = Path(__file__).resolve()
 
 
