@@ -82,6 +82,9 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
             found.append(Issue(True, f"当て板が{name}に食い込む（平面視で内縁 {origin_distance(pad):.2f} < 外半径 {radius:.2f}、z も重なる）"))
     box, rod_r = lug_box(spec), float(lookup_rod(spec.lug.thread)) / 2
     lug_z, rod_z = (z.lug_bottom, z.lug_top), (z.lug_bottom, z.lug_bottom + float(spec.lug.rod_length))
+    # ロッドとホルダー受けは見ない。ロッドはラグの箱の中を通り（`rod_fits` が通れば、平面視でラグに含まれる）、ホルダー受けは当て板に
+    # 載る（`holder_fits`。平面視で当て板に含まれる）。ロッドの z はラグの下端から始まるので、ロッドがホルダー受けの
+    # z にかかれば、ラグがホルダー受けの z にかかるか、ロッドが当て板の z にかかる。どちらも先に止まる。
     # クレードル: フレームの内面（正方形の半幅 frame_inner）、腕（`_arms`、厚みの中心はバンドの中心）。
     # 脚はフレームの内面より外、フレームの下にあり、ラグの上端はフレームより上なので、脚に届くラグはフレームの z にも
     # かかって内面の外に出る（フレームの検査で止まる）。
@@ -95,7 +98,6 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
         for what, hit in (
             ("ラグがホルダー受けに当たる", z_overlap(*lug_z, *holder_z) and circle_overlaps((0.0, y0), rb, lug)),
             ("ラグが当て板に当たる", z_overlap(*lug_z, *pad_z) and polygons_overlap(lug, pad)),
-            ("ロッドがホルダー受けに当たる", z_overlap(*rod_z, *holder_z) and math.dist(rod, (0.0, y0)) < rb + rod_r - EPS),
             ("ロッドが当て板に当たる", z_overlap(*rod_z, *pad_z) and circle_overlaps(rod, rod_r, pad)),
             ("ラグがクレードルのフレームの内面から外に出て当たる", z_overlap(*lug_z, *frame_z) and square_reach([lug]) > r.frame_inner + EPS),
             ("ラグがクレードルの腕に当たる", z_overlap(*lug_z, *arm_z) and any(polygons_overlap(lug, arm) for arm in arms)),
@@ -139,7 +141,7 @@ def flange_bolts_removable(spec: GatlingSpec) -> list[Issue]:
 
     平面視で頭が何かの下に入るなら、ボルトを抜くには頭をねじ込み長ぶん持ち上げる空きが要る（その部品の下端 −
     フランジ上面 ≥ 頭の高さ + ねじ込み長）。頭の高さだけを見ると、締めた状態は当たらなくても、バンド（とクレードル）を
-    外さないと管束を外せない。見る相手は胴バンドの環（頭が環の内面と外面の間にかかる）、耳、腕、脚、フレーム
+    外さないと管束を外せない。見る相手は胴バンドの環とゴムシート（頭が環の外面より内側にかかる）、耳、腕、脚、フレーム
     （頭が正方形の内面より外にかかる）。どれの下に入るかは頭の方位（`bolt_phase`）で決まる。
     """
     z, r, c = levels(spec), radii(spec), spec.cradle
@@ -149,7 +151,9 @@ def flange_bolts_removable(spec: GatlingSpec) -> list[Issue]:
     over: dict[str, float] = {}
     for centre in flange_bolt_points(spec):
         dist = math.hypot(*centre)
-        if dist - head < r.band_outer - EPS and dist + head > r.band_inner + EPS:
+        # ゴムシートが胴の外面からバンドの内面までを埋めるので、頭がバンドの外面より内側にかかれば下に入る。
+        # 胴の外面にかかる頭は `bolt_clearances` が fatal にする
+        if dist - head < r.band_outer - EPS:
             over["胴バンド"] = z.band_bottom
         for name, poly, bottom in _above_the_flange(spec):
             if circle_overlaps(centre, head, poly):

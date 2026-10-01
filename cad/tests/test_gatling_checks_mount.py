@@ -58,6 +58,37 @@ def test_a_bolt_head_under_a_band_tab_needs_the_lift_too():
     assert any("耳" in w and "抜けない" in w for w in found), found
 
 
+def test_the_band_bolt_head_on_the_plus_y_side_counts_as_part_of_the_tab():
+    """+Y 側の耳の外面は y 6.75（締め代の半分 0.75 + 板厚 6）、ボルトの頭はその外へ 6 出て y 12.75 まで。
+    位相 11° の頭（r 88、中心 y 16.79、下縁 11.79）は頭の範囲にだけかかる。12° では下縁 13.30 で外れる
+    （12° では 132° の頭が 135° の腕にかかるので、耳だけを見る）。"""
+    low = {"flange.bolt_seat": 12, "band.above_flange": 1}
+    assert any("耳" in w and "抜けない" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_phase=11, **low))))
+    assert not any("耳" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_phase=12, **low))))
+
+
+def test_a_bolt_head_under_a_cradle_leg_needs_the_lift_too():
+    """脚は 4 隅（中心 (±110.5, ±110.5)）の平角材の断面で、下端はバンドの中心。ボルト座 80（r 156）、位相 45° の頭は
+    45° の脚の下に入る。バンドを細く（10）、低く（1）すると脚の下端は 7 + 1 + 5 = 13 で、頭 6 + ねじ込み 5 に 5 足りない。"""
+    found = _fatal(cradle_fits(override(SPEC, flange__bolt_seat=80, flange__bolt_phase=45, band__bar__width=10, band__above_flange=1)))
+    assert any("脚" in w and "抜けない" in w for w in found), found
+
+
+def test_a_bolt_head_outside_the_frame_needs_the_lift_under_the_frame():
+    """胴を 26 に低くするとフレームの下面は 7 + 13 − 3 = 17 で、フランジ上面から 10（< 11）。ボルト座 20（r 96）、
+    位相 0° の頭は x 101 まで出て、フレームの内面 98 の外にかかる。"""
+    low = {"shell.plenum_height": 26, "band.bar.width": 6, "band.above_flange": 1, "flange.bolt_phase": 0}
+    assert any("フレーム" in w and "抜けない" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_seat=20, **low))))
+    assert not any("フレーム" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_seat=16.9, **low))))   # 頭の外縁 97.9
+
+
+def test_a_bolt_head_under_the_rubber_sheet_needs_the_lift_too():
+    """ゴムシートは胴の外面からバンドの内面までを埋める。ゴム 20 でバンドの内面 r 96 の内側に頭（r 81〜91）が入っても、
+    頭はゴムの下にあるので、バンドの下と同じく持ち上げる空きが要る。"""
+    assert any("胴バンド" in w and "抜けない" in w
+               for w in _fatal(cradle_fits(override(SPEC, band__rubber=20, band__above_flange=10.9))))
+
+
 def test_a_bolt_head_under_a_cradle_arm_needs_the_lift_too():
     """位相 45° の頭（r 88）は 45° の腕の下に入る。バンドを細く（10）、低く（1）すると腕の下端は 7 + 1 + 5 − 3 = 10。"""
     low = {"flange.bolt_seat": 12, "band.bar.width": 10, "band.above_flange": 1}
