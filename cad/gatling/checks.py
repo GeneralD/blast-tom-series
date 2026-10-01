@@ -345,16 +345,20 @@ def spacing(spec: GatlingSpec) -> list[Issue]:
 
 
 def ear_fits(spec: GatlingSpec) -> list[Issue]:
-    """受金の幅が、ロッド通し穴の両側に肉を残す（幅 ≥ 穴径 + 2 × 板厚）。幅が穴径以下だと受金が 2 片に割れる。
+    """受金の幅がロッド通し穴より広い（fatal）。穴の両側に板厚ぶんの肉が無ければ警告。
 
-    肉の下限は受金の板厚を流用する。穴の縁から板の縁までを板厚以上取るのは、打ち抜きや穴あけで縁が割れたり
-    曲がったりしない一般的な目安で、受金を新しい寸法で増やさずに済む。`plate.margin`（8）は削り出しの板の
-    縁で、既定の幅 20 では足りない（6.5 + 16 = 22.5）ので使わない。
+    幅が穴径以下だと受金が 2 片に割れるので fatal。肉の下限（穴径 + 2 × 板厚）は、打ち抜きや穴あけで縁が
+    割れたり曲がったりしない一般的な目安で、受金を新しい寸法で増やさずに済むよう板厚を流用する。目安なので
+    警告にとどめる（fatal にすると、板厚 8 で既定の幅 20 が出力できなくなる）。`plate.margin`（8）は削り出しの
+    板の縁で、既定の幅 20 では足りない（6.5 + 16 = 22.5）ので使わない。
     """
     e = spec.hoop.ear
     hole = float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)
-    return _at_least("受金の幅がロッド通し穴の両側の肉（板厚）に足りない（穴径 + 2 × 板厚）", float(e.width),
-                     hole + 2 * float(e.thickness))
+    width = float(e.width)
+    if width <= hole + EPS:
+        return [Issue(True, f"受金の幅がロッド通し穴の径以下で、受金が 2 片に割れる（{width:.2f} ≤ {hole:.2f}）")]
+    return _at_least("受金の幅がロッド通し穴の両側の肉（板厚）に足りない（穴径 + 2 × 板厚）", width,
+                     hole + 2 * float(e.thickness), fatal=False)
 
 
 def lug_fits(spec: GatlingSpec) -> list[Issue]:

@@ -90,10 +90,17 @@ def test_a_rod_that_does_not_clear_the_collar_is_fatal():
     assert _fatal(rod_fits(override(SPEC, lug__standoff=4.5, **thin))) == []                                # 77.75
 
 
-def test_an_ear_must_leave_a_wall_on_both_sides_of_the_rod_hole():
-    """穴（5.5 + 逃げ 1 = 6.5）の両側に板厚 6 の肉: 幅 18.5 以上。幅が穴径以下だと受金が 2 片に割れる。"""
-    for width in (5, 6.5, 18.4):
-        assert any("受金" in w for w in _fatal(ear_fits(override(SPEC, hoop__ear__width=width)))), width
+def test_an_ear_no_wider_than_the_rod_hole_splits_in_two_and_is_fatal():
+    """穴は 5.5 + 逃げ 1 = 6.5。幅が穴径以下だと受金が 2 片に割れる。"""
+    for width in (5, 6.5):
+        assert any("受金" in w and "割れる" in w for w in _fatal(ear_fits(override(SPEC, hoop__ear__width=width)))), width
+
+
+def test_a_thin_wall_beside_the_rod_hole_is_only_a_warning():
+    """穴の両側に板厚ぶんの肉（6.5 + 2 × 6 = 18.5）は目安なので、下回っても警告にとどめる。板厚 8 で既定の幅 20 も警告。"""
+    for values in ({"hoop.ear.width": 6.6}, {"hoop.ear.width": 18.4}, {"hoop.ear.thickness": 8}):
+        found = ear_fits(override(SPEC, **values))
+        assert found and not _fatal(found) and all("受金" in i.what for i in found), values
     assert ear_fits(override(SPEC, hoop__ear__width=18.5)) == []
 
 
