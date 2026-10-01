@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import pytest
@@ -47,3 +48,57 @@ def test_optional_hooks_are_bound_to_the_spec_like_the_required_ones():
     m = dataclasses.replace(demo, _module=module)
     assert m.drawing() == ("drawing", demo.spec)           # 引数なしで呼べる
     assert m.acoustic_model() == ("acoustic", demo.spec)
+
+
+def _write_model(root: Path, label: str) -> None:
+    """契約の最小実装。`label` で root ごとの違いを区別する。"""
+    pkg = root / "twin"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text(
+        "SPEC = object()\n"
+        f"def name(spec): return {label!r}\n"
+        "def override(*a, **k): return None\n"
+        "def assembly(): return {}\n"
+        "def parts(): return []\n"
+        "def bom(): return []\n"
+        "def issues(): return []\n",
+        encoding="utf-8",
+    )
+
+
+def test_discover_leaves_sys_path_untouched(tmp_path):
+    _write_model(tmp_path, "a")
+    before = list(sys.path)
+    discover(tmp_path)
+    assert sys.path == before
+
+
+def test_same_named_models_in_two_roots_are_not_mixed_up(tmp_path):
+    _write_model(tmp_path / "r1", "first")
+    _write_model(tmp_path / "r2", "second")
+    assert discover(tmp_path / "r1")["twin"].name() == "first"
+    assert discover(tmp_path / "r2")["twin"].name() == "second"
+
+
+def test_rediscovering_a_rewritten_model_reads_the_new_source(tmp_path):
+    _write_model(tmp_path, "old")
+    assert discover(tmp_path)["twin"].name() == "old"
+    (tmp_path / "twin" / "__init__.py").write_text(
+        (tmp_path / "twin" / "__init__.py").read_text(encoding="utf-8").replace("old", "new"),
+        encoding="utf-8",
+    )
+    assert discover(tmp_path)["twin"].name() == "new"
+
+
+def test_a_model_can_use_relative_imports_inside_its_package(tmp_path):
+    _write_model(tmp_path, "unused")
+    (tmp_path / "twin" / "params.py").write_text("LABEL = 'from-params'\n", encoding="utf-8")
+    init = tmp_path / "twin" / "__init__.py"
+    init.write_text(
+        init.read_text(encoding="utf-8").replace(
+            "def name(spec): return 'unused'",
+            "from .params import LABEL\ndef name(spec): return LABEL",
+        ),
+        encoding="utf-8",
+    )
+    assert discover(tmp_path)["twin"].name() == "from-params"
