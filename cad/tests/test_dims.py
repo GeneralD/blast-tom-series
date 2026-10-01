@@ -289,3 +289,129 @@ def test_as_provisional_still_copies_an_init_false_field_without_leaves():
 
     copied = as_provisional(_Plain(design(3)), "x")
     assert copied.base.source is Source.PROVISIONAL and copied.tag == "固定"
+
+
+# --- dict / set の中も辿る ---------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _Bag:
+    by_name: dict
+    nested: dict
+    pool: frozenset
+
+
+def _bag() -> _Bag:
+    return _Bag(
+        by_name={"od": design(10, "外径"), "len": provisional(20, "長さ"), 3: Choice("x", Source.DESIGN)},
+        nested={"inner": {"deep": provisional(1), "pts": (design(2), design(3))}},
+        pool=frozenset({design(5), provisional(7)}),
+    )
+
+
+def test_walk_descends_into_dict_values_with_repr_keys_in_the_path():
+    paths = [p for p, _ in walk(_bag())]
+    assert "by_name['od']" in paths and "by_name[3]" in paths
+    assert "nested['inner']['deep']" in paths and "nested['inner']['pts'][1]" in paths
+
+
+def test_walk_writes_dict_keys_with_repr_so_that_a_str_and_an_int_key_differ():
+    @dataclass(frozen=True)
+    class _H:
+        d: dict
+
+    paths = [p for p, _ in walk(_H({"1": design(1), 1: design(2)}))]
+    assert paths == ["d['1']", "d[1]"]
+
+
+def test_walk_visits_set_elements_in_a_deterministic_order_under_a_brace_path():
+    s = _bag()
+    first = [(p, float(d)) for p, d in walk(s.pool)]
+    again = [(p, float(d)) for p, d in walk(frozenset(reversed(list(s.pool))))]
+    assert first == again == [("{}", 5.0), ("{}", 7.0)]
+    assert [p for p, _ in walk(s)].count("pool{}") == 2
+
+
+def test_unsettled_sees_provisionals_inside_dicts_and_sets():
+    paths = [p for p, _ in unsettled(_bag())]
+    assert "by_name['len']" in paths and "nested['inner']['deep']" in paths and paths.count("pool{}") == 1
+
+
+def test_as_provisional_drops_every_source_inside_dicts_and_sets_and_keeps_the_original():
+    b = _bag()
+    copied = as_provisional(b, "別径から写した")
+    assert len(list(walk(copied))) == len(list(walk(b))) == 8
+    assert all(d.source is Source.PROVISIONAL for _, d in walk(copied))
+    assert isinstance(copied.by_name, dict) and isinstance(copied.pool, frozenset)
+    assert copied.by_name["od"] == 10 and copied.by_name[3].value == "x"
+    assert copied.nested["inner"]["pts"][1] == 3
+    assert b.by_name["od"].source is Source.DESIGN and b.nested["inner"]["pts"][0].source is Source.DESIGN
+    assert {d.source for d in b.pool} == {Source.DESIGN, Source.PROVISIONAL}, "元は変えない"
+
+
+def test_as_provisional_keeps_a_plain_set_a_set():
+    assert isinstance(as_provisional({design(1), design(2)}, "x"), set)
+
+
+def test_as_provisional_rejects_a_set_whose_copies_would_merge():
+    twins = frozenset({Choice("a", Source.DESIGN), Choice("a", Source.MEASURED)})
+    with pytest.raises(ValueError, match="潰れ"):
+        as_provisional(twins, "x")
+
+
+def test_as_provisional_returns_a_dict_or_set_without_leaves_as_it_was():
+    d, s = {"a": "文字列"}, frozenset({"x"})
+    assert as_provisional(d, "x") is d and as_provisional(s, "x") is s
+
+
+def test_override_replaces_a_dict_value_by_key_and_keeps_source_and_note():
+    b = _bag()
+    t = override(b, {"by_name['len']": 99, 'by_name["od"]': 11, "by_name[3]": "y",
+                     "nested['inner']['pts'][0]": 4})
+    assert float(t.by_name["len"]) == 99 and t.by_name["len"].source is Source.PROVISIONAL
+    assert t.by_name["len"].note == "長さ" and float(t.by_name["od"]) == 11
+    assert t.by_name[3].value == "y" and float(t.nested["inner"]["pts"][0]) == 4
+    assert isinstance(t.by_name, dict) and t.by_name is not b.by_name
+    assert float(b.by_name["len"]) == 20, "元の dict は変えない"
+
+
+def test_override_accepts_a_dict_key_that_contains_brackets_and_quotes():
+    @dataclass(frozen=True)
+    class _H:
+        d: dict
+
+    h = _H({"a]b": design(1), "it's": design(2)})
+    assert len(list(walk(h))) == 2
+    for path, leaf in walk(h):
+        t = override(h, {path: 50})
+        assert [float(v) for v in t.d.values()].count(50) == 1, path
+
+
+def test_override_rejects_a_missing_dict_key():
+    with pytest.raises(KeyError, match="nope"):
+        override(_bag(), {"by_name['nope']": 1})
+
+
+def test_override_rejects_a_path_into_a_set_with_a_message_that_says_why():
+    with pytest.raises(TypeError, match="set"):
+        override(_bag(), {"pool{}": 1})
+    with pytest.raises(TypeError, match="順序"):
+        override(_bag(), {"pool[0]": 1})
+
+
+def test_override_rejects_a_brace_path_on_something_that_is_not_a_set():
+    with pytest.raises(AttributeError, match=r"\{\}"):
+        override(_bag(), {"by_name{}": 1})
+
+
+@pytest.mark.parametrize("root", [_spec, _holder, _bag])
+def test_override_round_trips_every_path_walk_emits_except_set_paths(root):
+    s = root()
+    for path, leaf in walk(s):
+        if path.endswith("{}"):
+            continue
+        new = "ZZ" if isinstance(leaf, Choice) else float(leaf) + 1000
+        t = override(s, {path: new})
+        got = dict(walk(t))[path]
+        assert (got.value if isinstance(got, Choice) else float(got)) == new, path
+        assert (got.source, got.note) == (leaf.source, leaf.note), path

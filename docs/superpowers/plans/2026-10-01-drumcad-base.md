@@ -1,6 +1,6 @@
 # 共通基盤 `drumcad`（PR 2）実装計画
 
-> **実行後の注記:** この計画は実行済みの履歴で、コード片は実装後のレビュー修正の**前**のもの。レビューで直した点は、組立の全 solid 出力、D-18 の員数と質量、`PartInfo` の `standard` / `dimensions`、出力の退避、`Dim` の複製、添字つきパスの override、肉厚の警告、registry の読み込み、固有語テストの対象。現行の振る舞いはコードと仕様・D-18 が正。後続 PR の計画はこのコード片を写さず、main の実際の API から書くこと。
+> **実行後の注記:** この計画は実行済みの履歴で、コード片は実装後のレビュー修正の**前**のもの。レビューで直した点は、組立の全 solid 出力、D-18 の員数と質量、`PartInfo` の `standard` / `dimensions`、出力の退避、`Dim` の複製、添字つきパスの override、dict / set を辿る walk・as_provisional・override、`init=False` の葉の拒否、肉厚の警告、registry の読み込み、固有語テストの対象。現行の振る舞いはコードと仕様・D-18 が正。後続 PR の計画はこのコード片を写さず、main の実際の API から書くこと。
 >
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

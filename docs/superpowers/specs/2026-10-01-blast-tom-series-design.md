@@ -114,7 +114,7 @@ blast-tom-series/
 
 | モジュール | そのまま使う | インターフェースを新設する |
 |---|---|---|
-| `dims.py` | `Dim(float)` に出典 `Source` を持たせる仕組み。`measured / spec / design / derived / provisional`、`walk()` `unsettled()` `as_provisional()` | `Source` のラベルを本リポの意味に書き換える（`spec` = メーカー仕様書・カタログ値。証言系の出典は削除）。docstring から元の用途の語を除く。**文字列の選択肢を持つ葉 `Choice(value, source)`** を追加し、`walk()` が拾うようにする（型番・ねじ規格・仕上げ・`tuning_target` が出典と未決判定を持てるように） |
+| `dims.py` | `Dim(float)` に出典 `Source` を持たせる仕組み。`measured / spec / design / derived / provisional`、`walk()` `unsettled()` `as_provisional()` | `Source` のラベルを本リポの意味に書き換える（`spec` = メーカー仕様書・カタログ値。証言系の出典は削除）。docstring から元の用途の語を除く。**文字列の選択肢を持つ葉 `Choice(value, source)`** を追加し、`walk()` が拾うようにする（型番・ねじ規格・仕上げ・`tuning_target` が出典と未決判定を持てるように）。`walk()` は dataclass に加え tuple / list / dict / set の中まで降りる（`as_provisional` は同じ型で写し、`init=False` のフィールドに葉があれば `TypeError`） |
 | `checks.py`（新規） | — | `Issue(fatal: bool, what: str)`。**fatal が 0 件なら出力可。警告は表示して続行** |
 | `drawing/` | 図面の紙面・レイアウト・投影・寸法線・フォント（`view / layout / geometry / fonts`） | 注記・表題欄・図の一覧を**機種が返す**形にする。断面図・平面図の対象は機種が「部品名と切り方（半径方向断面 / 平面外形 / 平面図）」で指定する。員数と一般公差は独立した注記機能にする |
 | `viewer.py` | three.js の自己完結 `viewer.html` の雛形（部品ごとの表示切替・視点） | 部品表（部品名 → 表示名・色）を機種から受け取る。分解表示（軸方向にずらす）を追加。回転アニメは v2 まで入れない |
@@ -153,7 +153,7 @@ blast-tom-series/
 ```python
 SPEC: object                                   # dataclass(frozen=True) の寸法ツリー。葉は Dim または Choice
 def name(spec) -> str                          # 出力ディレクトリ名の語幹。例 "gatling-6-6"（機種-径inch-ラグ数）
-def override(spec, **path_values) -> object    # "tube.length": 500 のような属性パスで差し替えた SPEC を返す（sweep 用）
+def override(spec, **path_values) -> object    # "tube.length": 500 のような属性パスで差し替えた SPEC を返す（sweep 用）。パスは `a.b[0]`（tuple / list）、`a.b['key']`（dict）まで。set の中は順序が無いので対象外（`TypeError`）
 def assembly(spec) -> dict[str, cq.Workplane]  # 製作品の部品名 → 形状（組立座標系）。員数ぶんの solid をすべて置く（solid 数 = PartInfo.count、違えば fatal）。既製品は簡略形状でよい
 def parts(spec) -> list[PartInfo]              # 部品名・表示名・色・材質・製作品/既製品・2D の切り方（半径断面/平面外形/平面図/なし）・員数（1 以上。0 の部品は載せない）・規格・寸法（BOM の「規格・型番の系統」「寸法」。製作品の行に使う。既定は空）
 def bom(spec) -> list[BomRow]                  # 既製品の型番と員数を含む部品表
