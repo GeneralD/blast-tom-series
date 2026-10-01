@@ -14,7 +14,6 @@ from .common import compound, cylinder, ring
 BAND_SPLIT = 2     # 胴バンドは 2 分割
 
 
-
 def band(spec: GatlingSpec) -> cq.Workplane:
     """胴バンド。+Y 側と −Y 側の 2 つの半環。分割面（XZ 面）の両端に耳があり、M6 で Y 方向に締める。
 
