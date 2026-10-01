@@ -8,15 +8,19 @@ TypeError で止める — 機種を足したつもりで build に出てこな�
 root を `sys.path` に挿しっぱなしになり、同名の機種が別の root にあっても `sys.modules`
 のキャッシュが先に当たって古いものを返す。ここでは root ごとに別名で登録し、読むたびに
 置き換える（`from .params import ...` のような相対 import はパッケージ名で解決される）。
+下位モジュールも `_FreshLoader` で読む（読み込み中だけ `_FreshFinder` を `sys.meta_path` の先頭に置く）。
+本体だけ .pyc を避けても、`params.py` のような下位モジュールが古い .pyc に当たっては意味がない。
+読み込みが終わった後に関数の中で遅れて import するものは対象外（機種は先頭で import する）。
 機種側の `import drumcad` は従来どおり、呼び出し側が `cad/` を通している前提で動く。
 """
 
 from __future__ import annotations
 
 import hashlib
+import importlib.abc
 import importlib.util
 import sys
-from importlib.machinery import SourceFileLoader
+from importlib.machinery import PathFinder, SourceFileLoader
 from types import ModuleType
 from pathlib import Path
 
@@ -37,6 +41,21 @@ class _FreshLoader(SourceFileLoader):
         return self.source_to_code(self.get_data(path), path)
 
 
+class _FreshFinder(importlib.abc.MetaPathFinder):
+    """`prefix` 配下の名前だけ、標準の探索結果のローダーを `_FreshLoader` に差し替える。"""
+
+    def __init__(self, prefix: str) -> None:
+        self._prefix = prefix + "."
+
+    def find_spec(self, fullname, path=None, target=None):
+        if not fullname.startswith(self._prefix):
+            return None
+        spec = PathFinder.find_spec(fullname, path, target)
+        if spec is not None and type(spec.loader) is SourceFileLoader:
+            spec.loader = _FreshLoader(spec.loader.name, spec.loader.path)
+        return spec
+
+
 def _load(root: Path, name: str) -> ModuleType:
     # root の絶対パスから名前空間を作る。別 root の同名機種と衝突させない。
     tag = hashlib.sha1(str(root.resolve()).encode("utf-8")).hexdigest()[:10]
@@ -51,11 +70,15 @@ def _load(root: Path, name: str) -> ModuleType:
     )
     module = importlib.util.module_from_spec(spec)
     sys.modules[qualname] = module      # 相対 import が親を引けるよう、実行前に登録する
+    finder = _FreshFinder(qualname)
+    sys.meta_path.insert(0, finder)
     try:
         spec.loader.exec_module(module)
     except BaseException:
         del sys.modules[qualname]
         raise
+    finally:
+        sys.meta_path.remove(finder)    # 他の import に影響を残さない
     return module
 
 

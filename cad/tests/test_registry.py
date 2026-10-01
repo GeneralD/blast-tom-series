@@ -102,3 +102,24 @@ def test_a_model_can_use_relative_imports_inside_its_package(tmp_path):
         encoding="utf-8",
     )
     assert discover(tmp_path)["twin"].name() == "from-params"
+
+
+def test_rediscovering_picks_up_a_submodule_rewritten_with_the_same_length_in_the_same_second(tmp_path):
+    import os
+
+    _write_model(tmp_path, "unused")
+    params = tmp_path / "twin" / "params.py"
+    init = tmp_path / "twin" / "__init__.py"
+    init.write_text(
+        init.read_text(encoding="utf-8").replace(
+            "def name(spec): return 'unused'",
+            "from .params import LABEL\ndef name(spec): return LABEL",
+        ),
+        encoding="utf-8",
+    )
+    params.write_text("LABEL = 'aaaa'\n", encoding="utf-8")
+    assert discover(tmp_path)["twin"].name() == "aaaa"
+    stamp = params.stat().st_mtime_ns
+    params.write_text("LABEL = 'bbbb'\n", encoding="utf-8")       # 同じ長さ
+    os.utime(params, ns=(stamp, stamp))                           # 同じ更新時刻 = .pyc の検証をすり抜ける
+    assert discover(tmp_path)["twin"].name() == "bbbb"
