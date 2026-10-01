@@ -9,7 +9,7 @@ import cadquery as cq
 
 from ..fasteners import lookup_holder, lookup_rod, lookup_screw
 from ..params import GatlingSpec
-from ..placement import (band_bolt_x, cradle_y_rear, flange_bolt_points, levels, lug_angles, lug_box, radii,
+from ..placement import (BAND_SIDES, band_bolt_x, cradle_y_rear, flange_bolt_points, levels, lug_angles, lug_box, radii,
                          tip_bolt_points)
 from .common import around_z, compound, cylinder, cylinders, disc, ring
 
@@ -75,6 +75,6 @@ def bolt_tip(spec: GatlingSpec) -> cq.Workplane:
 def bolt_band(spec: GatlingSpec) -> cq.Workplane:
     """胴バンドの M6。+Y 側の耳の外面（y = gap/2 + 耳の厚み）に頭が座り、−Y 向きに締め代を渡って −Y 側の耳にねじ込む。"""
     s, z = lookup_screw(spec.band.bolt), levels(spec)
-    zc, top = (z.band_bottom + z.band_top) / 2, float(spec.band.gap) / 2 + float(spec.band.bar.thickness)
+    zc, top = z.band_centre, float(spec.band.gap) / 2 + float(spec.band.bar.thickness)
     return compound([_screw(float(s.head_dia), float(s.head_height), float(s.major), float(spec.band.bolt_length),
-                            (side * band_bolt_x(spec), top, zc), (0, -1, 0)) for side in (1, -1)])
+                            (side * band_bolt_x(spec), top, zc), (0, -1, 0)) for side in BAND_SIDES])

@@ -16,6 +16,15 @@ from .derived import MIL, derive
 from .fasteners import lookup_screw
 from .params import GatlingSpec
 
+# 胴バンドは 2 分割で固定する（分割数は SPEC の葉にしない）。分割面は XZ 面（y = 0）の 1 枚で、半環は +Y 側と
+# −Y 側、分割面の両端（+X 側と −X 側）に耳とボルトが付く。形はこの符号でループし、員数は `BAND_SPLIT` で数える。
+BAND_SIDES = (1, -1)
+BAND_SPLIT = len(BAND_SIDES)      # 半環の数 = 分割面の端の数（耳の組・ボルト・ゴムシートの数）
+
+# ラグ 1 個につき胴の取付穴は上下 2 つ（ラグの高さの中心から ± `lug.pitch` / 2）。
+LUG_HOLE_SIDES = (-1, 1)
+LUG_HOLES = len(LUG_HOLE_SIDES)
+
 
 def ring_points(count: int, radius: float, phase_deg: float = 0.0) -> list[tuple[float, float]]:
     """半径 `radius` の円周を `count` 等分した点。0 番は `phase_deg` の方向。"""

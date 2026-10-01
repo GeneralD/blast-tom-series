@@ -35,7 +35,7 @@ class Derived:
     shell_od: Dim
     shell_id: Dim
     head_od: Dim             # フレッシュフープの外径
-    areal_density: Dim       # 膜の面密度（膜厚 × 1.39 g/cm³。コーティングは含めない）
+    areal_density: Dim       # 膜の面密度（膜厚 × `FILM_DENSITY`。コーティングは含めない）
     tube_pitch: Dim          # 管の中心間
     pcd: Dim                 # 管の中心円の直径
     bolt_circle: Dim
@@ -47,11 +47,14 @@ class Derived:
 
 FILM_DENSITY = provisional(1.39e-3, "PET フィルムの一般値（g/mm³）。コーティングは含めない（PR 4）")
 MIL = 0.0254                 # mm
+_DENSITY_NOTE = f"膜厚 × {float(FILM_DENSITY) * 1e3:g} g/cm³"     # g/mm³ → g/cm³ は × 1000
 
 
 def derive(spec: GatlingSpec) -> Derived:
-    """寸法から導出値を計算する。`tube.count` が 3 未満だと周囲配置にならず割れるので、
-    呼ぶ側（`issues()`）が先に個数を検査する。`name()` は `issues()` より先に呼ばれるので、これを使わない。"""
+    """寸法から導出値を計算する。PCD = 中心間 / sin(180° / 本数) なので、`tube.count` が 3 未満だと
+    周囲配置にならない（0 は `ZeroDivisionError`、1 は sin(180°) ≈ 0 で割って巨大な値、2 は PCD が中心間と
+    等しく 2 本が向かい合うだけ）。`issues()` は `structure()` で 3 未満を fatal にして、ここへ来る前に返す。
+    `name()` は `issues()` より先に呼ばれるので、これを使わない。"""
     h, t, f, p = spec.head, spec.tube, spec.flange, spec.plate
     n = float(t.count)
     shell_od = float(h.fit_id) - float(h.fit_clearance)
@@ -63,15 +66,16 @@ def derive(spec: GatlingSpec) -> Derived:
     margin = float(p.margin)
     tube_ring = pcd + float(t.od) + 2 * margin
     shell_in = {"head.fit_id": h.fit_id, "head.fit_clearance": h.fit_clearance}
-    tube_in = {"tube.od": t.od, "tube.gap_ratio": t.gap_ratio, "tube.count": t.count}
+    pitch_in = {"tube.od": t.od, "tube.gap_ratio": t.gap_ratio}
+    tube_in = {**pitch_in, "tube.count": t.count}
     return Derived(
         shell_od=derived_from(shell_od, "フレッシュフープ内径 − 逃げ", shell_in),
         shell_id=derived_from(shell_id, "胴外径 − 2 × 肉厚", {**shell_in, "shell.thickness": spec.shell.thickness}),
         head_od=derived_from(head_od, "フレッシュフープ内径 + 2 × 肉厚",
                              {"head.fit_id": h.fit_id, "head.collar_wall": h.collar_wall}),
-        areal_density=derived_from(float(h.film_mil) * MIL * float(FILM_DENSITY), "膜厚 × 1.39 g/cm³",
+        areal_density=derived_from(float(h.film_mil) * MIL * float(FILM_DENSITY), _DENSITY_NOTE,
                                    {"head.film_mil": h.film_mil, "FILM_DENSITY": FILM_DENSITY}),
-        tube_pitch=derived_from(pitch, "od × (1 + gap_ratio)", tube_in),
+        tube_pitch=derived_from(pitch, "od × (1 + gap_ratio)", pitch_in),
         pcd=derived_from(pcd, "中心間 / sin(180° / 本数)", tube_in),
         bolt_circle=derived_from(bolt_circle, "胴外径 + 2 × ボルト座", {**shell_in, "flange.bolt_seat": f.bolt_seat}),
         plate_od=derived_from(max(tube_ring, bolt_circle + 2 * margin, shell_od),

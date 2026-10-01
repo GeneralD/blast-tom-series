@@ -8,19 +8,19 @@ import cadquery as cq
 
 from ..derived import derive
 from ..params import GatlingSpec
-from ..placement import levels, lug_angles
+from ..placement import LUG_HOLE_SIDES, levels, lug_angles, radii
 from .common import cylinder, ring
 
 
 def shell(spec: GatlingSpec) -> cq.Workplane:
-    """プレナム胴。ラグの取付穴は、ラグ 1 個につき上下 2 つ（`lug.pitch` 間隔）。"""
-    z, d = levels(spec), derive(spec)
-    body = ring(float(d.shell_od) / 2, float(d.shell_id) / 2, z.flange_top, z.shell_top)
+    """プレナム胴。ラグの取付穴は、ラグ 1 個につき上下 `LUG_HOLES` つ（`lug.pitch` 間隔）。"""
+    z, r_out = levels(spec), radii(spec).shell
+    body = ring(r_out, float(derive(spec).shell_id) / 2, z.flange_top, z.shell_top)
     zc = (z.lug_top + z.lug_bottom) / 2
     radius = float(spec.lug.hole_dia) / 2
     for angle in lug_angles(spec):
-        for dz in (-float(spec.lug.pitch) / 2, float(spec.lug.pitch) / 2):
-            bore = cylinder((0, 0, zc + dz), (1, 0, 0), 2 * radius, float(d.shell_od))
+        for side in LUG_HOLE_SIDES:
+            bore = cylinder((0, 0, zc + side * float(spec.lug.pitch) / 2), (1, 0, 0), 2 * radius, 2 * r_out)
             body = body.cut(bore.rotate((0, 0, 0), (0, 0, 1), angle))
     return body
 
@@ -31,7 +31,7 @@ def edge(spec: GatlingSpec) -> cq.Workplane:
     頂部の小 R は同じ大きさの面取りで近似する（形状の確認用。R は図面で指示する）。
     """
     e, z = spec.edge, levels(spec)
-    r_out = float(derive(spec).shell_od) / 2
+    r_out = radii(spec).shell
     r_in = r_out - float(e.width)
     chamfer = float(e.radius)
     drop = (r_out - chamfer - r_in) * math.tan(math.radians(float(e.angle)))

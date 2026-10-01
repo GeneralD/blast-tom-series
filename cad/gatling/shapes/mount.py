@@ -8,10 +8,8 @@ import cadquery as cq
 
 from ..fasteners import lookup_screw
 from ..params import GatlingSpec
-from ..placement import band_bolt_x, band_tab_length, cradle_corner, cradle_y_rear, grip_y, levels, radii
+from ..placement import BAND_SIDES, band_bolt_x, band_tab_length, cradle_corner, cradle_y_rear, grip_y, levels, radii
 from .common import compound, cylinder, ring
-
-BAND_SPLIT = 2     # 胴バンドは 2 分割
 
 
 def band(spec: GatlingSpec) -> cq.Workplane:
@@ -28,12 +26,12 @@ def band(spec: GatlingSpec) -> cq.Workplane:
     screw = lookup_screw(spec.band.bolt)
     zc = z.band_centre
     halves = []
-    for sign in (1, -1):
+    for sign in BAND_SIDES:
         half_box = cq.Workplane("XY").box(2 * r.band_outer, r.band_outer - half_gap, height, centered=(True, False, False))
         body = ring(r.band_outer, r.band_inner, z.band_bottom, z.band_top).intersect(
             half_box.translate((0, half_gap if sign > 0 else -r.band_outer, z.band_bottom)))
         hole = float(screw.clearance if sign > 0 else screw.tap_drill)
-        for side in (1, -1):
+        for side in BAND_SIDES:
             # 耳は半環の肉に食い込ませる（接するだけだと union が別 solid のまま残す）
             reach = r.band_outer + tab - r.band_inner
             x0 = r.band_inner if side > 0 else -r.band_outer - tab

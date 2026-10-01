@@ -8,8 +8,7 @@ from drumcad.stock import nearest
 
 from .derived import derive
 from .params import GatlingSpec
-from .placement import radii
-from .shapes.mount import BAND_SPLIT
+from .placement import BAND_SPLIT, radii
 
 SILICONE = Material("シリコーンゴム", 1.2e-3)                       # g/mm³（概算。ガスケットの質量用）
 PURCHASED = Material("既製品（材質は実物で確認）", 0.0)               # 既製品の質量は部品表に載せない
@@ -50,7 +49,7 @@ def parts(spec: GatlingSpec) -> list[PartInfo]:
         buy("lug", "ラグ", "#6b7280", n_lug, (0, 0, 0), spec.lug.model.value, f"H{fmt(spec.lug.height)}"),
         buy("rod", "テンションロッド", "#8b93a0", n_lug, (0, 0, 0.3), f"テンションロッド {spec.lug.thread.value}",
             f"L{fmt(spec.lug.rod_length)}"),
-        fab("band", "胴バンド", "#b6bcc6", BAND_SPLIT, "none", (0, 0, 0), f"{bar} {fmt(spec.band.bar.width)} × {fmt(spec.band.bar.thickness)}（2 分割）",
+        fab("band", "胴バンド", "#b6bcc6", BAND_SPLIT, "none", (0, 0, 0), f"{bar} {fmt(spec.band.bar.width)} × {fmt(spec.band.bar.thickness)}（{BAND_SPLIT} 分割）",
             f"内径 φ{fmt(2 * r.band_inner)}"),
         buy("bolt_band", f"ボルト {spec.band.bolt.value}（胴バンド）", "#3a3f47", BAND_SPLIT, (0, 0.6, 0),
             f"六角穴付きボルト {spec.band.bolt.value}", f"L{fmt(spec.band.bolt_length)}"),

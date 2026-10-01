@@ -29,9 +29,8 @@ def ear(spec: GatlingSpec) -> cq.Workplane:
     """受金。内外リングの上端に載って両方をつなぎ、ロッドを通す穴がリングの間に開く。"""
     z, r, e = levels(spec), radii(spec), spec.hoop.ear
     span = r.hoop_out_outer - r.hoop_in_inner
-    thick = float(e.thickness)
-    plate = (cq.Workplane("XY").box(span, float(e.width), thick)
-             .translate(((r.hoop_in_inner + r.hoop_out_outer) / 2, 0, z.hoop_top + thick / 2)))
+    plate = (cq.Workplane("XY").box(span, float(e.width), z.ear_top - z.hoop_top)
+             .translate(((r.hoop_in_inner + r.hoop_out_outer) / 2, 0, (z.hoop_top + z.ear_top) / 2)))
     hole = (cq.Workplane("XY").workplane(offset=z.hoop_top).center(r.rod, 0)
-            .circle((float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)) / 2).extrude(thick))
+            .circle((float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)) / 2).extrude(z.ear_top - z.hoop_top))
     return around_z(plate.cut(hole), lug_angles(spec))
