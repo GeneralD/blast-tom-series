@@ -44,9 +44,26 @@ def test_the_flange_bolts_can_be_pulled_out_under_the_band():
 
 
 def test_bolt_heads_outside_the_band_in_plan_need_no_lift():
-    # ボルト座 12: 頭の内縁 = 76 + 12 − 5 = 83 = バンド外面
-    assert not any("抜けない" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_seat=12, band__above_flange=1))))
-    assert any("抜けない" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_seat=11.9, band__above_flange=1))))
+    """ボルト座 12: 頭の内縁 = 76 + 12 − 5 = 83 = バンド外面。位相 30° では頭（30°, 90°, …）が耳（0°, 180°）にも
+    腕（45°, 135°, …）にも平面視で重ならない（腕の中心線から 88 sin 15° ≈ 22.8 > 腕の半幅 12.5 + 頭の半径 5）。
+    頭がどこの下に入るかは方位で決まるので、位相を明示する。"""
+    at = {"flange.bolt_phase": 30, "band.above_flange": 1}
+    assert not any("抜けない" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_seat=12, **at))))
+    assert any("抜けない" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_seat=11.9, **at))))
+
+
+def test_a_bolt_head_under_a_band_tab_needs_the_lift_too():
+    """位相 5° の頭（r 88）は +X 側の耳（x 77〜103、y −6.75〜12.75。+Y 側にはボルトの頭も出る）の下に入る。"""
+    found = _fatal(cradle_fits(override(SPEC, flange__bolt_seat=12, flange__bolt_phase=5, band__above_flange=1)))
+    assert any("耳" in w and "抜けない" in w for w in found), found
+
+
+def test_a_bolt_head_under_a_cradle_arm_needs_the_lift_too():
+    """位相 45° の頭（r 88）は 45° の腕の下に入る。バンドを細く（10）、低く（1）すると腕の下端は 7 + 1 + 5 − 3 = 10。"""
+    low = {"flange.bolt_seat": 12, "band.bar.width": 10, "band.above_flange": 1}
+    assert any("腕" in w and "抜けない" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_phase=45, **low))))
+    assert any("腕" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_phase=34, **low))))     # 腕の中心線から 11°
+    assert not any("抜けない" in w for w in _fatal(cradle_fits(override(SPEC, flange__bolt_phase=33, **low))))   # 12°: 88 sin 12° > 17.5
 
 
 def test_the_holder_body_must_leave_a_wall_around_the_l_rod_bore_and_sit_on_the_pad():

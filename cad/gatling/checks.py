@@ -16,7 +16,7 @@ from drumcad.stock import nearest
 from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_rod, lookup_screw
 from .derived import derive
 from .params import GatlingSpec
-from .placement import (cradle_corner, cradle_y_rear, flange_bolt_points, grip_y, levels, lug_angles, lug_box, radii,
+from .placement import (band_tab_length, cradle_corner, cradle_y_rear, flange_bolt_points, grip_y, levels, lug_angles, lug_box, radii,
                         tip_bolt_points, tube_points)
 
 EPS = 1e-6                    # 縁ちょうどの値が浮動小数の誤差で fatal にならないように
@@ -345,7 +345,7 @@ def lug_fits(spec: GatlingSpec) -> list[Issue]:
 
 
 def cradle_fits(spec: GatlingSpec) -> list[Issue]:
-    """クレードルとフープの逃げ（負なら fatal、小さければ警告）、脚の高さ、バンドの下でフランジのボルトを抜けること。"""
+    """クレードルとフープの逃げ（負なら fatal、小さければ警告）、脚の高さ、胴バンド・耳・クレードルの下でフランジのボルトを抜けること。"""
     z, r, c = levels(spec), radii(spec), spec.cradle
     clearance = r.frame_inner - r.hoop_out_outer
     found = _at_least("クレードルがフープの外径と干渉する（フレーム内面と外リング外面の逃げ）", clearance, 0.0)
@@ -353,15 +353,58 @@ def cradle_fits(spec: GatlingSpec) -> list[Issue]:
         found = _at_least("クレードルとフープの逃げが小さい", clearance, MIN_CRADLE_CLEARANCE, fatal=False)
     leg = z.frame_centre - float(c.bar.thickness) / 2 - (z.band_bottom + z.band_top) / 2
     found += _at_least("クレードルの脚の高さが無い（フレームがバンドより上になければならない）", leg, EPS)
-    # 平面視で頭が胴バンドの下に入るなら、ボルトを抜くには頭をねじ込み長ぶん持ち上げる空きが要る。
-    # 頭の高さだけを見ると、締めた状態は当たらなくても、バンド（とクレードル）を外さないと管束を外せない
-    screw = lookup_screw(spec.flange.bolt)
-    head_inner = float(derive(spec).bolt_circle) / 2 - float(screw.head_dia) / 2
-    if head_inner < r.band_outer - EPS:
-        engagement = float(spec.flange.bolt_length) - float(spec.flange.thickness) - float(spec.gasket.thickness)
-        found += _at_least("胴バンドの下でフランジのボルトを抜けない（バンド下端とフランジ上面の距離 < 頭の高さ + ねじ込み長）",
-                           z.band_bottom - z.flange_top, float(screw.head_height) + engagement)
+    return found + flange_bolts_removable(spec)
+
+
+def _above_the_flange(spec: GatlingSpec) -> list[tuple[str, list[Point], float]]:
+    """フランジの上にある、胴バンドの環より外の部品の平面形（凸多角形）と下端の z（名前, 多角形, 下端）。
+
+    耳: 分割面の両端、x はバンドの内面から外面 + 耳の長さ、y は −Y 側の耳の外面から +Y 側の耳の外面 + ボルトの頭
+    （締め代の隙間も含めて 1 つの矩形で見る）。腕: 対角線上、バンドの外面から脚の中心まで、幅は平角材の幅。
+    脚: 4 隅の平角材の断面。値は形状（`shapes/mount.py`）と同じ placement から読む。
+    """
+    z, r, c, b = levels(spec), radii(spec), spec.cradle, spec.band
+    screw = lookup_screw(b.bolt)
+    w, t = float(c.bar.width), float(c.bar.thickness)
+    zb = (z.band_bottom + z.band_top) / 2
+    near, far = float(b.gap) / 2 + float(b.bar.thickness), float(b.gap) / 2 + float(b.bar.thickness) + float(screw.head_height)
+    tab_bottom = min(z.band_bottom, zb - float(screw.head_dia) / 2)
+    reach = r.band_outer + band_tab_length(spec)
+    # ±X の両側。ボルトの頭は両側とも +Y 側に出る（180° 回すと y も裏返るので、回さずに x の範囲を反転する）
+    found = [("胴バンドの耳", _rect(r.band_inner, reach, -near, far), tab_bottom),
+             ("胴バンドの耳", _rect(-reach, -r.band_inner, -near, far), tab_bottom)]
+    found += [("クレードルの腕", _rect(r.band_outer, cradle_corner(spec), -w / 2, w / 2, a), zb - t / 2) for a in (45, 135, 225, 315)]
+    k = r.frame_inner + w / 2
+    found += [("クレードルの脚", _rect(sx * k - w / 2, sx * k + w / 2, sy * k - t / 2, sy * k + t / 2), zb)
+              for sx in (1, -1) for sy in (1, -1)]
     return found
+
+
+def flange_bolts_removable(spec: GatlingSpec) -> list[Issue]:
+    """胴バンド・耳・クレードルを付けたまま、フランジのボルトを抜ける。
+
+    平面視で頭が何かの下に入るなら、ボルトを抜くには頭をねじ込み長ぶん持ち上げる空きが要る（その部品の下端 −
+    フランジ上面 ≥ 頭の高さ + ねじ込み長）。頭の高さだけを見ると、締めた状態は当たらなくても、バンド（とクレードル）を
+    外さないと管束を外せない。見る相手は胴バンドの環（頭が環の内面と外面の間にかかる）、耳、腕、脚、フレーム
+    （頭が正方形の内面より外にかかる）。どれの下に入るかは頭の方位（`bolt_phase`）で決まる。
+    """
+    z, r, c = levels(spec), radii(spec), spec.cradle
+    screw = lookup_screw(spec.flange.bolt)
+    head = float(screw.head_dia) / 2
+    need = float(screw.head_height) + float(spec.flange.bolt_length) - float(spec.flange.thickness) - float(spec.gasket.thickness)
+    over: dict[str, float] = {}
+    for centre in flange_bolt_points(spec):
+        dist = math.hypot(*centre)
+        if dist - head < r.band_outer - EPS and dist + head > r.band_inner + EPS:
+            over["胴バンド"] = z.band_bottom
+        for name, poly, bottom in _above_the_flange(spec):
+            if _circle_overlaps(centre, head, poly):
+                over[name] = bottom
+        if max(abs(centre[0]), abs(centre[1])) + head > r.frame_inner + EPS:
+            over["クレードルのフレーム"] = z.frame_centre - float(c.bar.thickness) / 2
+    return [issue for name, bottom in over.items()
+            for issue in _at_least(f"{name}の下でフランジのボルトを抜けない（{name}の下端とフランジ上面の距離 < 頭の高さ + ねじ込み長）",
+                                   bottom - z.flange_top, need)]
 
 
 def holder_fits(spec: GatlingSpec) -> list[Issue]:
