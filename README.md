@@ -14,7 +14,7 @@
 
 | # | 機種 | 概要 | 状態 |
 |---|---|---|---|
-| 1 | **Gatling Tom** | 6" ヘッド＋短いプレナム胴の下に SUS パイプ 6 本の管束。ミニガンの意匠。管は 1/2 波長の共鳴管として鳴らす | **設計仕様あり** → [docs/superpowers/specs/2026-10-01-blast-tom-series-design.md](docs/superpowers/specs/2026-10-01-blast-tom-series-design.md) |
+| 1 | **Gatling Tom** | 6" ヘッド＋短いプレナム胴の下に SUS パイプ 6 本の管束。ミニガンの意匠。管 6 本を膜・プレナムと結合した共鳴系として鳴らす | **設計仕様あり**（[仕様](docs/superpowers/specs/2026-10-01-blast-tom-series-design.md)）。**形状・部品表・viewer あり**（`cad/gatling/`。寸法は仮値を含む）。音響と図面は未 |
 | 2 | Vulcan Tom | 細長い筒に丸穴が多数。バルカン砲のバレルジャケットの意匠 | スケッチのみ |
 | 3 | Magnum Tom | 18" シングルヘッドのフロアタム、3 本脚。リボルバーのシリンダーの意匠 | スケッチのみ |
 

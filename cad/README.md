@@ -10,7 +10,9 @@
     uv run --project cad python cad/build.py gatling    # 1 機種
     uv run --project cad pytest cad/tests -q            # テスト
 
-出力は `cad/out/<機種の name()>/`（`demo` なら `demo-6-6/`）。まだ決めきっていない値（`provisional`）が 1 つでも残っていると `-PROVISIONAL` が付く。
+出力は `cad/out/<機種の name()>/`（`demo` なら `demo-6-6/`、既定の Gatling は `gatling-6-6-PROVISIONAL/`）。まだ決めきっていない値（`provisional`）が 1 つでも残っていると `-PROVISIONAL` が付く。
+
+Gatling の出力は、部品ごとの `<部品名>.step` / `.stl` / `.svg`、組立の `assembly.*`、`viewer.html`、`bom.md`。寸法は `cad/gatling/params.py` の `SPEC`、導出値は `cad/gatling/derived.py`、部品の置き場所は `cad/gatling/placement.py`。整合性の検査は `cad/gatling/checks.py` の `issues()` が入口で、部品どうしの干渉は `interference.py`、平面の幾何は `planar.py` にある。fatal が 1 つでもあれば何も出力しない。
 
 `viewer.html` はブラウザで開く（three.js を cdnjs から読む以外は自己完結）:
 
