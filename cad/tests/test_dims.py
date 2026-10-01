@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import copy
+import io
+import pickle
+from dataclasses import asdict, dataclass
 
 import pytest
 from drumcad.dims import (Choice, Dim, Source, as_provisional, design, derived, measured,
@@ -131,3 +134,38 @@ def test_override_replaces_a_choice_with_a_string():
 def test_override_rejects_an_unknown_path():
     with pytest.raises(AttributeError, match="tube.nope"):
         override(_spec(), {"tube.nope": 1})
+
+
+# --- コピー・直列化 ---------------------------------------------------------
+
+
+def _round_trip(obj, protocol=pickle.HIGHEST_PROTOCOL):
+    """自分で作ったバイト列だけを戻す。信頼できない入力には使わない。"""
+    return pickle.Unpickler(io.BytesIO(pickle.dumps(obj, protocol))).load()
+
+
+def test_a_dim_survives_deepcopy_with_source_and_note():
+    d = provisional(450, "結合モデルで振ってから決める")
+    c = copy.deepcopy(d)
+    assert c == 450 and c.source is Source.PROVISIONAL and c.note == d.note
+
+
+@pytest.mark.parametrize("protocol", range(2, pickle.HIGHEST_PROTOCOL + 1))
+def test_a_dim_survives_a_pickle_round_trip(protocol):
+    d = measured(12.7, "ノギスで測った")
+    c = _round_trip(d, protocol)
+    assert c == 12.7 and c.source is Source.MEASURED and c.note == "ノギスで測った"
+
+
+def test_a_choice_survives_deepcopy_and_pickle():
+    c = Choice("DW turret", Source.PROVISIONAL, "実物を測るまで")
+    assert copy.deepcopy(c) == c
+    assert _round_trip(c) == c
+
+
+def test_asdict_keeps_every_leaf_value_source_and_note():
+    s = _spec()
+    d = asdict(s)
+    assert d["tube"]["length"] == 450 and d["tube"]["length"].source is Source.PROVISIONAL
+    assert d["tube"]["finish"] == s.tube.finish
+    assert d["profile"][1][0].source is Source.PROVISIONAL

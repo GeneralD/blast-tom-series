@@ -42,6 +42,11 @@ class Dim(float):
         self.note = note
         return self
 
+    def __getnewargs__(self) -> tuple[float, Source, str]:
+        # float の派生は pickle / deepcopy が `__new__(cls, 値)` だけで復元しようとし、
+        # 必須の source で落ちる。asdict も内部で deepcopy するので、ここで引数を渡す。
+        return float(self), self.source, self.note
+
     def __repr__(self) -> str:
         tail = f" — {self.note}" if self.note else ""
         return f"{float(self):g} [{self.source.value}{tail}]"
