@@ -134,7 +134,7 @@ blast-tom-series/
 | `acoustics/coupled.py` | 膜 (0,n) ＋ プレナム（短い円筒セグメント）＋ 管 N 本の**結合系の複素固有値**。膜側の空気の付加質量、膜の損失、両開口の放射抵抗を含む。最低根がヘルムホルツ相当、以降が膜寄り・管寄りの根。各根に膜／管の寄与率を付ける |
 | `acoustics/synth.py` | 膜の打撃 → 観測点の音圧の伝達関数を周波数領域で組み、ヘッド面と管先端の放射を観測点で複素加算し、逆 FFT でインパルス応答 → 16-bit / 48 kHz の wav |
 | `acoustics/report.py` | 共鳴表（Markdown）と sweep の比較表。列は結合系の最低 4 根（周波数・Q・T60・膜／管寄与率） |
-| `bom.py` | 部品表。行 = 部品名・製作品／既製品・素材・規格・寸法・員数・型番・質量（製作品は形状から、既製品は `spec` の値） |
+| `bom.py` | 部品表。行 = 部品名・製作品／既製品・素材・規格・寸法・員数・型番・質量（製作品の質量は形状から、規格・寸法は `PartInfo` から。既製品は `spec` の値） |
 | `process.py` | 工程数量表。レーザー切り部品点数、ロール曲げ回数、TIG 総長、旋削部品数、研磨面積、タップ数。工賃欄は空で、見積もりの項目表として使う。材料費は規格材の m 単価 × 長さ（単価は `docs/vendors.md` から `spec`） |
 
 ### 4.3 音響モデルの限界（`docs/acoustics.md` に明記）
@@ -154,7 +154,7 @@ SPEC: object                                   # dataclass(frozen=True) の寸�
 def name(spec) -> str                          # 出力ディレクトリ名の語幹。例 "gatling-6-6"（機種-径inch-ラグ数）
 def override(spec, **path_values) -> object    # "tube.length": 500 のような属性パスで差し替えた SPEC を返す（sweep 用）
 def assembly(spec) -> dict[str, cq.Workplane]  # 製作品の部品名 → 形状（組立座標系）。既製品は簡略形状でよい
-def parts(spec) -> list[PartInfo]              # 部品名・表示名・色・材質・製作品/既製品・2D の切り方（半径断面/平面外形/平面図/なし）・員数
+def parts(spec) -> list[PartInfo]              # 部品名・表示名・色・材質・製作品/既製品・2D の切り方（半径断面/平面外形/平面図/なし）・員数・規格・寸法（BOM の「規格・型番の系統」「寸法」。製作品の行に使う。既定は空）
 def bom(spec) -> list[BomRow]                  # 既製品の型番と員数を含む部品表
 def drawing(spec) -> DrawingSpec               # 表題欄の行・注記の行・図の一覧・一般公差・平面度などの幾何公差
 def issues(spec) -> list[Issue]                # 整合性チェック。fatal が無ければ出力可

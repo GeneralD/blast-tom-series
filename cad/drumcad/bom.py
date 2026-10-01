@@ -1,4 +1,5 @@
-"""部品表。製作品の行は形状と材質から build が作り、既製品の行は機種が書く。"""
+"""部品表。製作品の行は形状と材質から build が作り（規格・寸法は `PartInfo` に機種が書く）、
+既製品の行は機種が書く。"""
 
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ def full_bom(model: Model) -> list[BomRow]:
     for info in model.parts():
         if info.made != "fabricated":
             continue
-        rows.append(BomRow(info.label, "fabricated", info.material, "", "", info.count,
+        rows.append(BomRow(info.label, "fabricated", info.material, info.standard, info.dimensions, info.count,
                            mass_g=mass_g(parts[info.name], info.material)))
     return rows + list(model.bom())
 

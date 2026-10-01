@@ -18,6 +18,13 @@ def test_full_bom_adds_a_row_per_fabricated_part_with_its_mass():
     assert rows[3].part_number == "DWSM2200"
 
 
+def test_a_fabricated_row_carries_the_standard_and_dimensions_the_model_wrote():
+    rows = {r.name: r for r in full_bom(discover(TESTS)["demo"])}
+    assert rows["胴"].standard == "手すり用 #400 研磨管"
+    assert rows["胴"].dimensions == "φ152.4 × t1.2 × L100"
+    assert rows["底板"].standard == "" and rows["底板"].dimensions == ""   # 書かなければ空
+
+
 def test_bom_markdown_is_a_table_with_a_total_mass():
     m = discover(TESTS)["demo"]
     md = bom_markdown(m.name(), full_bom(m))

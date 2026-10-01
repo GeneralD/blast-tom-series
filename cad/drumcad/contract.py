@@ -28,6 +28,8 @@ class PartInfo:
     count: int = 1
     section: Section = "none"      # 2D 図面の切り方（PR 5 で使う）
     explode: tuple[float, float, float] = (0.0, 0.0, 0.0)   # viewer の分解方向（単位ベクトル）
+    standard: str = ""             # BOM「規格・型番の系統」。製作品の行は機種がここに書く
+    dimensions: str = ""           # BOM「寸法」（例: φ38.1 × t1.2 × L450）。同上
 
 
 @dataclass(frozen=True)
