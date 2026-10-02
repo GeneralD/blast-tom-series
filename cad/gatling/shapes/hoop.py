@@ -1,4 +1,4 @@
-"""ダブルフープ（オリジナル設計）: 内リング・外リング・受金。"""
+"""ダブルフープ（オリジナル設計）: 内リング・外リング（管の環）・受金。D-20。"""
 
 from __future__ import annotations
 
@@ -13,24 +13,39 @@ from .common import around_z, ring
 def hoop_inner(spec: GatlingSpec) -> cq.Workplane:
     """内リング（カウンターフープ）。下面がフレッシュフープの上端に載り、内径はヘッド外径より小さい。
 
+    膜面から上端までの高さ（`inner.height`）がリムの高さで、口径が小さいほどリムが深いとミスショットしやすいので浅くする。
     ロッドを締めると受金がこの環を押し下げ、環がフレッシュフープを押し下げて膜をエッジに張る。
     """
     z, r = levels(spec), radii(spec)
     return ring(r.hoop_in_outer, r.hoop_in_inner, z.head_top, z.hoop_top)
 
 
-def hoop_outer(spec: GatlingSpec) -> cq.Workplane:
-    """外リング（質量リング）。上端を内リングに揃え、受金で内リングと結ぶ。"""
+def _pipe_section(spec: GatlingSpec, bore: bool) -> cq.Workplane:
+    """外リングの管の環。断面（XZ 面の円）を Z 軸の周りに回す。`bore` が偽なら中実（受金を管の形で切る刃物）。"""
     z, r = levels(spec), radii(spec)
-    return ring(r.hoop_out_outer, r.hoop_out_inner, z.hoop_top - float(spec.hoop.outer.height), z.hoop_top)
+    half = float(spec.hoop.outer.od) / 2
+    at = (r.hoop_out_centre, z.pipe_centre)               # XZ 面の局所座標（x = 半径、y = 高さ）
+    section = cq.Workplane("XZ").moveTo(*at).circle(half)
+    if bore:
+        section = section.moveTo(*at).circle(half - float(spec.hoop.outer.thickness))
+    return section.revolve(360, (0, 0, 0), (0, 1, 0))     # 局所の y 軸 = Z 軸の周り
+
+
+def hoop_outer(spec: GatlingSpec) -> cq.Workplane:
+    """外リング（質量リング）。管を丸めた中空の環で、上端を内リングの上端に揃え、受金で内リングと結ぶ。"""
+    return _pipe_section(spec, bore=True)
 
 
 def ear(spec: GatlingSpec) -> cq.Workplane:
-    """受金。内外リングの上端に載って両方をつなぎ、ロッドを通す穴がリングの間に開く。"""
+    """受金。内外リングの間に沈む水平の板で、下面を膜面（内リングの下端）に揃える。
+
+    内リングの外面から管の中心まで径方向に伸び、管の外形で切り欠いて管に沿わせ、内リングと管の両方に溶接する。
+    ロッドを通す穴はリングの間（ロッドの半径）に開く。
+    """
     z, r, e = levels(spec), radii(spec), spec.hoop.ear
-    span = r.hoop_out_outer - r.hoop_in_inner
-    plate = (cq.Workplane("XY").box(span, float(e.width), z.ear_top - z.hoop_top)
-             .translate(((r.hoop_in_inner + r.hoop_out_outer) / 2, 0, (z.hoop_top + z.ear_top) / 2)))
-    hole = (cq.Workplane("XY").workplane(offset=z.hoop_top).center(r.rod, 0)
-            .circle((float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)) / 2).extrude(z.ear_top - z.hoop_top))
-    return around_z(plate.cut(hole), lug_angles(spec))
+    span = r.hoop_out_centre - r.hoop_in_outer
+    plate = (cq.Workplane("XY").box(span, float(e.width), z.ear_top - z.ear_bottom)
+             .translate(((r.hoop_in_outer + r.hoop_out_centre) / 2, 0, (z.ear_bottom + z.ear_top) / 2)))
+    hole = (cq.Workplane("XY").workplane(offset=z.ear_bottom).center(r.rod, 0)
+            .circle((float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)) / 2).extrude(z.ear_top - z.ear_bottom))
+    return around_z(plate.cut(hole).cut(_pipe_section(spec, bore=False)), lug_angles(spec))

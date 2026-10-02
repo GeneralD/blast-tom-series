@@ -44,7 +44,7 @@ def test_the_viewer_embeds_every_part_and_says_how_many_values_are_pending(out_d
     assert all(len(p["indices"]) > 0 for p in data["parts"])
     assert data["note"] == f"未決 {len(unsettled(discover(CAD)['gatling'].spec))} 件（仮値）"
     assert any(p["label"] == "管 ×6" for p in data["parts"])
-    assert (data["zmin"], data["zmax"]) == pytest.approx((-450, 151.19), abs=0.01)  # viewer は 0.01 に丸める。管の先端から、ロッドの上端（受金の上面 148.19 から 3 mm 出る）まで
+    assert (data["zmin"], data["zmax"]) == pytest.approx((-450, 129.19), abs=0.01)  # viewer は 0.01 に丸める。管の先端から、フープの上端まで（受金とロッドの頭はその下）
 
 
 def test_the_bom_lists_fabricated_and_purchased_rows_with_the_total_mass(out_dir):

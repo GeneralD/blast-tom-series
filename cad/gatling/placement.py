@@ -58,13 +58,15 @@ def lug_angles(spec: GatlingSpec) -> list[float]:
 class Levels:
     """z 座標（mm）。
 
-    前半（`ear_top` 〜 `tube_tip`）は軸の上に積む部品の高さで、上から順（受金 → フープ → ヘッド → エッジ → 胴 →
-    フランジ → ガスケット → ヘッダープレート → 管とクランプ）。後半（`hoop_bottom` 以降）はフープの下端と、
-    胴の脇に付く部品（ラグ・胴バンド・クレードル・当て板・ホルダー受け）の高さで、上下の順には並べていない。
+    前半（`hoop_top` 〜 `tube_tip`）は軸の上に積む部品の高さで、上から順（フープ → 受金 → ヘッド → エッジ → 胴 →
+    フランジ → ガスケット → ヘッダープレート → 管とクランプ）。後半（`pipe_centre` 以降）は外リングの管・フープの
+    下端・テンションロッドと、胴の脇に付く部品（ラグ・胴バンド・クレードル・当て板・ホルダー受け）の高さで、
+    上下の順には並べていない。
     """
 
-    ear_top: float            # 受金の上面
-    hoop_top: float           # 内外リングの上端（揃える）
+    hoop_top: float           # 内リングの上端 = 外リングの管の上端（揃える）。膜面からの高さがリムの高さ（inner.height）
+    ear_top: float            # 受金の上面（フープの上端より下。内外リングの間に沈む）
+    ear_bottom: float         # 受金の下面（= 膜面 = 内リングの下端）
     head_top: float           # 膜の上面（= フレッシュフープの上端、内リングの下面）
     edge_top: float           # ベアリングエッジの頂部（= 膜の下面。§5.4 の「ヘッド面」）
     collar_bottom: float      # フレッシュフープの下端（胴とエッジ環の外側に垂れる）
@@ -77,7 +79,10 @@ class Levels:
     tip_top: float            # 先端クランプのヘッダー側の面
     tip_bottom: float
     tube_tip: float
-    hoop_bottom: float        # 内外リングの下端のうち低いほう
+    pipe_centre: float        # 外リングの管の中心の高さ（= フープの上端 − 管の外径 / 2）
+    hoop_bottom: float        # フープの下端（内リングの下面と管の下端のうち低いほう）
+    rod_top: float            # テンションロッドの頭の上面（頭は受金の上面に載る）
+    rod_tip: float            # テンションロッドの軸の先（受金の上面から rod_length 下）
     lug_top: float
     lug_bottom: float
     band_bottom: float
@@ -100,7 +105,9 @@ def levels(spec: GatlingSpec) -> Levels:
     head_top = edge_top + float(spec.head.film_mil) * MIL
     collar_bottom = head_top - float(spec.head.collar_height)
     hoop_top = head_top + float(spec.hoop.inner.height)
-    hoop_bottom = hoop_top - max(float(spec.hoop.inner.height), float(spec.hoop.outer.height))
+    pipe = float(spec.hoop.outer.od)
+    hoop_bottom = min(head_top, hoop_top - pipe)
+    ear_top = head_top + float(spec.hoop.ear.thickness)
     lug_top = min(collar_bottom, hoop_bottom) - float(spec.hoop.takeup)
     mid_top = -float(c.mid_position) * length
     tip_bottom = -length + float(t.protrusion_ratio) * float(t.od)
@@ -109,12 +116,12 @@ def levels(spec: GatlingSpec) -> Levels:
     frame_top = frame_centre + float(spec.cradle.bar.thickness) / 2
     pad_top = frame_top + float(spec.cradle.pad.thickness)
     return Levels(
-        ear_top=hoop_top + float(spec.hoop.ear.thickness), hoop_top=hoop_top,
-        head_top=head_top, edge_top=edge_top, collar_bottom=collar_bottom, shell_top=shell_top, flange_top=flange_top,
+        hoop_top=hoop_top, ear_top=ear_top, ear_bottom=head_top, head_top=head_top, edge_top=edge_top, collar_bottom=collar_bottom, shell_top=shell_top, flange_top=flange_top,
         gasket_top=gasket_top, header_bottom=-float(spec.header.thickness),
         mid_top=mid_top, mid_bottom=mid_top - float(c.mid_thickness),
         tip_top=tip_bottom + float(c.tip_thickness), tip_bottom=tip_bottom, tube_tip=-length,
-        hoop_bottom=hoop_bottom, lug_top=lug_top, lug_bottom=lug_top - float(spec.lug.height),
+        pipe_centre=hoop_top - pipe / 2, hoop_bottom=hoop_bottom,
+        rod_top=ear_top + float(spec.lug.rod_head_height), rod_tip=ear_top - float(spec.lug.rod_length), lug_top=lug_top, lug_bottom=lug_top - float(spec.lug.height),
         band_bottom=band_bottom, band_top=band_bottom + float(spec.band.bar.width),
         band_centre=band_bottom + float(spec.band.bar.width) / 2,
         frame_centre=frame_centre, frame_top=frame_top, pad_top=pad_top,
@@ -129,10 +136,11 @@ class Radii:
     shell: float
     collar: float             # フレッシュフープの外面（ヘッド外径の半分）
     rod: float                # ロッド（ラグのねじ）の中心
-    hoop_in_inner: float
-    hoop_in_outer: float
-    hoop_out_inner: float
-    hoop_out_outer: float
+    hoop_in_inner: float      # 内リングの内面
+    hoop_in_outer: float      # 内リングの外面（= 受金の内端）
+    hoop_out_inner: float     # 外リングの管の内側の接線（管の中心の高さで最も軸に近い所）
+    hoop_out_centre: float    # 外リングの管の中心（= 受金の外端）
+    hoop_out_outer: float     # 外リングの管の外面
     band_inner: float
     band_outer: float
     frame_inner: float        # クレードルのフレーム内面（正方形の半幅）
@@ -144,14 +152,30 @@ def radii(spec: GatlingSpec) -> Radii:
     hoop_in_inner = float(d.head_od) / 2 - float(spec.hoop.seat)          # フレッシュフープの上面に掛かる
     hoop_in_outer = hoop_in_inner + float(spec.hoop.inner.thickness)
     hoop_out_inner = hoop_in_outer + float(spec.hoop.gap)
+    pipe = float(spec.hoop.outer.od)
     band_inner = shell + float(spec.band.rubber)
     band_outer = band_inner + float(spec.band.bar.thickness)
     return Radii(
         shell=shell, collar=float(d.head_od) / 2, rod=shell + float(spec.lug.standoff),
         hoop_in_inner=hoop_in_inner, hoop_in_outer=hoop_in_outer,
-        hoop_out_inner=hoop_out_inner, hoop_out_outer=hoop_out_inner + float(spec.hoop.outer.thickness),
+        hoop_out_inner=hoop_out_inner, hoop_out_centre=hoop_out_inner + pipe / 2, hoop_out_outer=hoop_out_inner + pipe,
         band_inner=band_inner, band_outer=band_outer, frame_inner=band_outer + float(spec.cradle.clearance),
     )
+
+
+def pipe_inner_radius(spec: GatlingSpec, z0: float, z1: float) -> float:
+    """外リングの管の外面のうち、胴の軸の側の半径を、z の帯 [z0, z1] の中で最も小さい所で返す。
+
+    管の断面は中心 (`hoop_out_centre`, `pipe_centre`)、半径 = 外径 / 2 の円。帯が管の中心の高さを含めば内側の接線
+    （`hoop_out_inner`）、含まなければ中心に近い端の高さでの値。帯が管に掛からなければ無限大（当たる相手が無い）。
+    ロッドの軸と頭が管に当たらないかを見るのに使う（`checks.rod_fits`）。
+    """
+    z, r = levels(spec), radii(spec)
+    half = float(spec.hoop.outer.od) / 2
+    d = max(z0 - z.pipe_centre, z.pipe_centre - z1, 0.0)
+    if d >= half:
+        return math.inf
+    return r.hoop_out_centre - math.sqrt(half * half - d * d)
 
 
 def lug_box(spec: GatlingSpec) -> tuple[float, float, float, float]:

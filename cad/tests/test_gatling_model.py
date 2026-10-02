@@ -63,7 +63,7 @@ def test_override_through_the_model_moves_the_name_the_parts_and_the_derived_val
 
 
 def test_the_default_spec_is_provisional_so_the_output_would_be_suffixed(gatling):
-    assert len(unsettled(gatling.spec)) == 19
+    assert len(unsettled(gatling.spec)) == 23       # D-20 でリムの高さ・肉厚とロッドの頭の径・高さ（4 件）が仮で増えた
 
 
 def test_once_every_leaf_is_settled_nothing_is_provisional_and_every_derived_value_is_derived(gatling):

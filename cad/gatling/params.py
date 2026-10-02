@@ -45,6 +45,14 @@ class HoopRing:
 
 
 @dataclass(frozen=True)
+class HoopPipe:
+    """管を丸めた環（外リング）。管束の `Tube` とは別の型（本数・長さを持たない）。"""
+
+    od: Dim                  # 管の外径
+    thickness: Dim           # 管の肉厚
+
+
+@dataclass(frozen=True)
 class Ear:
     count: Dim
     width: Dim               # 受金の幅（周方向）
@@ -54,9 +62,9 @@ class Ear:
 
 @dataclass(frozen=True)
 class Hoop:
-    inner: HoopRing          # カウンターフープ
-    outer: HoopRing          # 質量リング
-    gap: Dim                 # 内外リングの間隔（径方向）
+    inner: HoopRing          # カウンターフープ（リム）。height が膜面から上端までの高さ（リムの高さ）
+    outer: HoopPipe          # 質量リング。管を丸めた環で、上端を内リングの上端に揃える
+    gap: Dim                 # 内リングの外面から外リング（管）の内側の接線までの間隔（径方向）
     seat: Dim                # 内リングがフレッシュフープの上面に掛かる幅（半径）。内径 = ヘッド外径 − 2 × seat
     takeup: Dim              # 締め代: フレッシュフープとフープの下端からラグの上端まで（ヘッドを引き下ろす余地）
     ear: Ear
@@ -71,7 +79,9 @@ class Lug:
     count: Dim
     standoff: Dim            # 胴外面からロッド中心まで
     hole_dia: Dim            # 胴の取付穴の径
-    rod_length: Dim
+    rod_length: Dim          # テンションロッドの軸の長さ（頭の下面から先端まで）
+    rod_head_dia: Dim        # テンションロッドの頭の径（受金の上面に載る）
+    rod_head_height: Dim
 
 
 @dataclass(frozen=True)
@@ -181,6 +191,8 @@ class GatlingSpec:
 
 
 _REAL = "置き値（実物を測るまで）"
+_RIM = "剛性を保ちつつリムを浅く。試作で詰める（D-20）"
+_HOOP_PIPE = "手すり用 #400 研磨管 φ25.4 × t1.5（D-20）"
 
 SPEC = GatlingSpec(
     head=Head(
@@ -196,9 +208,9 @@ SPEC = GatlingSpec(
     shell=Shell(thickness=design(1.2), plenum_height=design(100)),
     edge=Edge(angle=design(45), radius=design(1.5), height=design(10), width=design(4, "胴より厚く取って 45° の面を切る")),
     hoop=Hoop(
-        inner=HoopRing(thickness=design(3, "新規設計"), height=design(25, "新規設計")),
-        outer=HoopRing(thickness=design(3, "質量リング"), height=design(25, "質量リング")),
-        gap=design(8, "ロッドが通る間隔"),
+        inner=HoopRing(thickness=provisional(4, _RIM), height=provisional(12, _RIM)),
+        outer=HoopPipe(od=design(25.4, _HOOP_PIPE), thickness=design(1.5, _HOOP_PIPE)),
+        gap=design(10, "ロッドとその頭が通る間隔（D-20）"),
         seat=design(1.0, "フレッシュフープの上面に掛かる幅（環の肉厚 head.collar_wall の内側に収める。hoop_seat が見る）"),
         takeup=design(5, "チューニングでヘッドとフープを引き下ろす代"),
         ear=Ear(count=design(6, "ラグ数と同じ"), width=design(20), thickness=design(6),
@@ -210,9 +222,11 @@ SPEC = GatlingSpec(
         height=provisional(35, _REAL),
         thread=Choice("#12-24", Source.PROVISIONAL, _REAL),
         count=design(6, "管の本数と方位を揃える"),
-        standoff=provisional(8, _REAL),
+        standoff=provisional(10, _REAL),
         hole_dia=provisional(5, _REAL),
-        rod_length=provisional(82, _REAL),
+        rod_length=provisional(50, _REAL),
+        rod_head_dia=provisional(9, _REAL),
+        rod_head_height=provisional(5, _REAL),
     ),
     tube=Tube(
         count=design(6, "D-09"),

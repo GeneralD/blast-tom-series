@@ -27,7 +27,7 @@ def test_no_dimension_is_a_bare_number():
 def test_the_default_spec_has_unsettled_values_and_each_says_what_it_waits_for():
     pending = dict(unsettled(SPEC))
     assert {"head.model", "head.fit_id", "lug.pitch", "lug.height", "lug.thread", "tube.length", "tube.gap_ratio",
-            "mount.type"} <= set(pending)
+            "mount.type", "hoop.inner.height", "hoop.inner.thickness", "lug.rod_head_dia", "lug.rod_head_height"} <= set(pending)
     assert all(leaf.note for leaf in pending.values())
     assert "実物" in pending["lug.pitch"].note and "PR 4" in pending["tube.length"].note
 
@@ -43,7 +43,7 @@ def test_the_sources_follow_the_section_5_2_table():
                          "cradle.bar.width", "cradle.bar.thickness", "cradle.clearance", "cradle.handle_length",
                          "cradle.pad.width", "cradle.pad.depth", "cradle.pad.thickness",
                          "flange.bolt_count", "flange.bolt", "clamp.bolt",
-                         "hoop.inner.thickness", "hoop.inner.height", "hoop.outer.thickness", "hoop.outer.height",
+                         "hoop.outer.od", "hoop.outer.thickness",
                          "head.f01_range[0]", "head.f01_range[1]"}
     leaves = dict(walk(SPEC))
     assert settled_by_design <= set(leaves)                  # 綴りの誤りで検査が空振りしない
@@ -58,7 +58,10 @@ def test_the_defaults_are_the_section_5_2_values():
     assert (float(s.clamp.mid_position), float(s.clamp.tip_thickness), float(s.clamp.mid_thickness)) == (0.55, 6, 3)
     assert (float(s.header.thickness), float(s.flange.thickness), float(s.gasket.thickness)) == (6, 6, 1)
     assert (float(s.flange.bolt_count), float(s.flange.bolt_phase), float(s.flange.bolt_seat)) == (6, 30, 10)
-    assert (float(s.plate.margin), float(s.hoop.gap), float(s.hoop.ear.count), float(s.lug.count)) == (8, 8, 6, 6)
+    assert (float(s.plate.margin), float(s.hoop.gap), float(s.hoop.ear.count), float(s.lug.count)) == (8, 10, 6, 6)
+    assert (float(s.hoop.inner.height), float(s.hoop.inner.thickness)) == (12, 4)                     # D-20: リムを浅く
+    assert (float(s.hoop.outer.od), float(s.hoop.outer.thickness)) == (25.4, 1.5)                    # 手すり用 #400 研磨管
+    assert (float(s.lug.rod_head_dia), float(s.lug.rod_head_height), float(s.lug.rod_length)) == (9, 5, 50)
     assert (float(s.shell.thickness), float(s.shell.plenum_height)) == (1.2, 100)
     assert (float(s.edge.angle), float(s.edge.radius), float(s.edge.height)) == (45, 1.5, 10)
     assert [float(x) for x in s.head.f01_range] == [250, 400] and float(s.head.loss_factor) == 0.02

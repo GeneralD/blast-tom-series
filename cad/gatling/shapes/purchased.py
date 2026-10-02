@@ -36,10 +36,12 @@ def lug(spec: GatlingSpec) -> cq.Workplane:
 
 
 def rod(spec: GatlingSpec) -> cq.Workplane:
-    """テンションロッド。ラグの下端から上へ、内外リングの間を通って受金の穴に出る（必要長の検査は `checks.rod_fits`）。"""
-    z, r = levels(spec), radii(spec)
-    return around_z(cylinders([(r.rod, 0)], float(lookup_rod(spec.lug.thread)), z.lug_bottom, z.lug_bottom + float(spec.lug.rod_length)),
-                    lug_angles(spec))
+    """テンションロッド。頭が受金の上面に載り、軸が受金の穴から内外リングの間を下りてラグにねじ込む
+    （軸の先がラグに届くか・ラグの下に出ないか、頭がリングに当たらないかの検査は `checks.rod_fits`）。"""
+    z, r, s = levels(spec), radii(spec), spec.lug
+    shaft = cylinders([(r.rod, 0)], float(lookup_rod(s.thread)), z.rod_tip, z.ear_top)
+    head = cylinders([(r.rod, 0)], float(s.rod_head_dia), z.ear_top, z.rod_top)
+    return around_z(shaft.union(head), lug_angles(spec))
 
 
 def holder(spec: GatlingSpec) -> cq.Workplane:

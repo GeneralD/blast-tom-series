@@ -23,6 +23,8 @@ def parts(spec: GatlingSpec) -> list[PartInfo]:
     d, r = derive(spec), radii(spec)
     t, s, c = spec.tube, spec.shell, spec.clamp
     stock, _ = nearest(float(t.od), float(t.thickness))
+    pipe = spec.hoop.outer
+    hoop_stock, _ = nearest(float(pipe.od), float(pipe.thickness))
     n_tube, n_lug = int(float(t.count)), int(float(spec.lug.count))
     n_bolt = int(float(spec.flange.bolt_count))
     sheet = "SUS304 板"
@@ -38,17 +40,17 @@ def parts(spec: GatlingSpec) -> list[PartInfo]:
         buy("head", "ヘッド 6\"", "#e9e4d4", 1, (0, 0, 1.2), spec.head.model.value, f"フレッシュフープ内径 φ{fmt(spec.head.fit_id)}"),
         fab("hoop_inner", "内リング", "#aab4c0", 1, "radial", (0, 0, 0.8), f"{bar}を丸めて TIG 突合せ",
             f"内径 φ{fmt(2 * r.hoop_in_inner)} × 幅{fmt(spec.hoop.inner.height)} × t{fmt(spec.hoop.inner.thickness)}"),
-        fab("hoop_outer", "外リング（質量リング）", "#9aa5b3", 1, "radial", (0, 0, 0.8), f"{bar}を丸めて TIG 突合せ",
-            f"内径 φ{fmt(2 * r.hoop_out_inner)} × 幅{fmt(spec.hoop.outer.height)} × t{fmt(spec.hoop.outer.thickness)}"),
-        fab("ear", "受金", "#c9ced6", int(float(spec.hoop.ear.count)), "outline", (0, 0, 0.8), f"{sheet} レーザー切り",
-            f"{fmt(spec.hoop.ear.width)} × {fmt(r.hoop_out_outer - r.hoop_in_inner)} × t{fmt(spec.hoop.ear.thickness)}"),
+        fab("hoop_outer", "外リング（質量リング）", "#9aa5b3", 1, "radial", (0, 0, 0.8), f"{hoop_stock.family}を曲げて TIG 突合せ",
+            f"φ{fmt(pipe.od)} × t{fmt(pipe.thickness)}、内径 φ{fmt(2 * r.hoop_out_inner)}（中心径 φ{fmt(2 * r.hoop_out_centre)}）"),
+        fab("ear", "受金", "#c9ced6", int(float(spec.hoop.ear.count)), "outline", (0, 0, 0.8), f"{sheet} レーザー切り（外端を管の形に切り欠く）",
+            f"{fmt(spec.hoop.ear.width)} × {fmt(r.hoop_out_centre - r.hoop_in_outer)} × t{fmt(spec.hoop.ear.thickness)}"),
         fab("edge", "ベアリングエッジ環", "#d3d8df", 1, "none", (0, 0, 0.4), "SUS304 旋削（胴に溶接後、エッジを仕上げ）",
             f"φ{fmt(d.shell_od)} × 幅{fmt(spec.edge.width)} × H{fmt(spec.edge.height)}"),
         fab("shell", "プレナム胴", "#c9ced6", 1, "radial", (0, 0, 0), f"{sheet}を丸めて TIG 突合せ",
             f"φ{fmt(d.shell_od)} × t{fmt(s.thickness)} × H{fmt(s.plenum_height)}"),
         buy("lug", "ラグ", "#6b7280", n_lug, (0, 0, 0), spec.lug.model.value, f"H{fmt(spec.lug.height)}"),
         buy("rod", "テンションロッド", "#8b93a0", n_lug, (0, 0, 0.3), f"テンションロッド {spec.lug.thread.value}",
-            f"L{fmt(spec.lug.rod_length)}"),
+            f"L{fmt(spec.lug.rod_length)}（頭 φ{fmt(spec.lug.rod_head_dia)} × H{fmt(spec.lug.rod_head_height)}）"),
         fab("band", "胴バンド", "#b6bcc6", BAND_SPLIT, "none", (0, 0, 0), f"{bar} {fmt(spec.band.bar.width)} × {fmt(spec.band.bar.thickness)}（{BAND_SPLIT} 分割）",
             f"内径 φ{fmt(2 * r.band_inner)}"),
         buy("bolt_band", f"ボルト {spec.band.bolt.value}（胴バンド）", "#3a3f47", BAND_SPLIT, (0, 0.6, 0),

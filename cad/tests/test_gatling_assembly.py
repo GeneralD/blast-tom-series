@@ -57,6 +57,11 @@ def test_fabricated_standards_and_dimensions_are_written_from_the_spec():
     assert info["tube"].dimensions == "φ38.1 × t1.2 × L480（組立後に L450 へ切り詰め）"
     assert info["shell"].dimensions == "φ152 × t1.2 × H100"
     assert info["header"].dimensions == "φ188 × t6" and info["flange"].dimensions == "φ188 / φ149.6 × t6"
+    assert info["hoop_inner"].dimensions == "内径 φ153.4 × 幅12 × t4"
+    assert info["hoop_outer"].standard == "手すり用 #400 研磨管を曲げて TIG 突合せ"
+    assert info["hoop_outer"].dimensions == "φ25.4 × t1.5、内径 φ181.4（中心径 φ206.8）"
+    assert info["ear"].dimensions == "20 × 22.7 × t6"                                  # 内リングの外面から管の中心まで
+    assert info["rod"].dimensions == "L50（頭 φ9 × H5）"
     changed = {p.name: p for p in parts(override(SPEC, tube__length=500, tube__od=42.7, shell__plenum_height=90))}
     assert changed["tube"].dimensions == "φ42.7 × t1.2 × L530（組立後に L500 へ切り詰め）"
     assert changed["shell"].dimensions == "φ152 × t1.2 × H90"

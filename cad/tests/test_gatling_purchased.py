@@ -31,19 +31,22 @@ def test_the_film_rests_on_the_bearing_edge_and_the_collar_hangs_outside_the_she
 def test_six_lugs_stand_outside_the_shell_a_takeup_below_the_collar_with_a_bore_for_the_rod():
     part = lug(SPEC)
     box = _box(part)
-    assert part.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((69.1905, 104.1905))
-    assert _inside(part, 78, 0, 80) and not _inside(part, 84, 0, 80)           # 胴の脇の箱、ロッド穴は空き
+    assert part.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((63.7905, 98.7905))
+    assert _inside(part, 78, 0, 80) and not _inside(part, 86, 0, 80)           # 胴の脇の箱、ロッド穴は空き
     assert not _inside(part, 75, 0, 80)                                          # 胴の中には入らない
-    assert part.solids().vals()[0].Volume() == pytest.approx(16 * 16 * 35 - math.pi * 2.75**2 * 35, rel=1e-6)
+    assert part.solids().vals()[0].Volume() == pytest.approx(20 * 20 * 35 - math.pi * 2.75**2 * 35, rel=1e-6)
 
 
-def test_six_tension_rods_rise_through_the_ring_gap_past_the_ear_top():
+def test_six_tension_rods_hang_from_the_ear_top_with_the_head_on_the_ear():
+    """頭（φ9 × 5）が受金の上面 123.19 に載り、軸（φ5.5 × 50）が下へ伸びてラグに入る。"""
     part = rod(SPEC)
     box = _box(part)
-    assert part.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((69.1905, 151.1905))   # 受金の上面 148.19 から 3 出る
-    assert _inside(part, 84, 0, 100) and not _inside(part, 80, 0, 100)
-    assert part.solids().vals()[0].Volume() == pytest.approx(math.pi * 2.75**2 * 82, rel=1e-6)
-    assert _box(rod(override(SPEC, lug__rod_length=90))).zmax == pytest.approx(159.1905)
+    assert part.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((73.1905, 128.1905))
+    assert _inside(part, 86, 0, 100) and _inside(part, 86 + 2.7, 0, 100) and not _inside(part, 86 + 2.8, 0, 100)   # 軸
+    assert _inside(part, 86 + 4.4, 0, 125) and not _inside(part, 86 + 4.6, 0, 125)                                # 頭
+    assert part.solids().vals()[0].Volume() == pytest.approx(math.pi * (2.75**2 * 50 + 4.5**2 * 5), rel=1e-6)
+    longer = _box(rod(override(SPEC, lug__rod_length=60)))
+    assert (longer.zmin, longer.zmax) == pytest.approx((63.1905, 128.1905))     # 頭の位置は変わらず、先が下がる
 
 
 def test_the_holder_clamp_stands_on_the_pad_with_a_rod_bore_along_x():
