@@ -115,6 +115,15 @@ def test_the_ears_are_welded_to_both_rings_without_overlapping_them():
         assert ears.distance(other) == pytest.approx(0, abs=1e-6)        # 接する（溶接する面がある）
 
 
+def test_the_ear_hugs_the_inner_ring_along_its_round_outer_face_without_a_gap():
+    """受金の内端は平らではなく、内リングの外面（R 80.7）の円柱で切って円弧で沿わせる。幅 20 の端（y = 10）でも隙間が無い。"""
+    e, r = ear(SPEC), radii(SPEC).hoop_in_outer
+    y = 10 - 1e-3                                                           # 幅の端（20 / 2）の内側
+    edge_x = math.sqrt(r * r - y * y)                                       # 内リングの外面が y でいる x（80.07）
+    assert _inside(e, edge_x + 0.05, y, 120) and not _inside(e, edge_x - 0.05, y, 120)    # 円弧に沿う。平らな端なら x = 80.7 まで空く
+    assert _inside(e, r + 0.05, 0, 120) and not _inside(e, r - 0.05, 0, 120)             # 中央（y = 0）は内リングの外面
+
+
 def test_the_hoop_follows_the_head_size():
     bigger = override(SPEC, head__fit_id=165.1)
     assert _box(hoop_inner(bigger)).xlen > _box(hoop_inner(SPEC)).xlen

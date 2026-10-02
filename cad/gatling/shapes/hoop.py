@@ -39,13 +39,17 @@ def hoop_outer(spec: GatlingSpec) -> cq.Workplane:
 def ear(spec: GatlingSpec) -> cq.Workplane:
     """受金。内外リングの間に沈む水平の板で、下面を膜面（内リングの下端）に揃える。
 
-    内リングの外面から管の中心まで径方向に伸び、管の外形で切り欠いて管に沿わせ、内リングと管の両方に溶接する。
-    ロッドを通す穴はリングの間（ロッドの半径）に開く。
+    板は内リングの外面より内側から始め、外端を管の外形で切るのと同じく、内端を内リングの外面の円柱で切って円弧で沿わせる
+    （平らな端だと、内リングの外面に y = 0 の線でしか接せず、幅の端で隙間が開く）。内リングと管の両方に溶接する。
+    ロッドを通す穴はリングの間（ロッドの半径）に開く。部品表の寸法欄の長さは内リングの外面から管の中心まで。
     """
     z, r, e = levels(spec), radii(spec), spec.hoop.ear
-    span = r.hoop_out_centre - r.hoop_in_outer
-    plate = (cq.Workplane("XY").box(span, float(e.width), z.ear_top - z.ear_bottom)
-             .translate(((r.hoop_in_outer + r.hoop_out_centre) / 2, 0, (z.ear_bottom + z.ear_top) / 2)))
+    height = z.ear_top - z.ear_bottom
+    start = r.hoop_in_outer - min(float(e.width) / 2, r.hoop_in_outer / 2)   # 幅の端の隅が内リングの外面の内側に入る
+    plate = (cq.Workplane("XY").box(r.hoop_out_centre - start, float(e.width), height)
+             .translate(((start + r.hoop_out_centre) / 2, 0, (z.ear_bottom + z.ear_top) / 2)))
+    inner_ring = cq.Workplane("XY").workplane(offset=z.ear_bottom).circle(r.hoop_in_outer).extrude(height)
+    plate = plate.cut(inner_ring)
     hole = (cq.Workplane("XY").workplane(offset=z.ear_bottom).center(r.rod, 0)
             .circle((float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)) / 2).extrude(z.ear_top - z.ear_bottom))
     return around_z(plate.cut(hole).cut(_pipe_section(spec, bore=False)), lug_angles(spec))
