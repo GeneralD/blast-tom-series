@@ -18,10 +18,10 @@ from drumcad.stock import nearest
 from .bounds import at_least, at_most
 from .derived import derive
 from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_rod, lookup_screw
-from .interference import flange_bolts_removable, mount_clear
+from .interference import flange_bolts_removable, hoop_rings, mount_clear
 from .params import GatlingSpec
-from .placement import flange_bolt_points, levels, radii, tip_bolt_points, tube_points
-from .planar import EPS
+from .placement import flange_bolt_points, levels, pipe_inner_radius, radii, tip_bolt_points, tube_points
+from .planar import EPS, z_overlap
 
 MIN_ENGAGEMENT = 0.75         # ねじ込み長 / 呼び径の下限（下回ると警告）
 MIN_CRADLE_CLEARANCE = 5.0    # クレードルとフープの逃げがこれ未満なら警告（mm）
@@ -31,9 +31,9 @@ _COUNTS = {"tube.count": 3, "lug.count": 1, "flange.bolt_count": 1, "hoop.ear.co
 _POSITIVE = (
     "head.fit_id", "head.film_mil", "head.collar_wall", "head.collar_height", "shell.thickness", "shell.plenum_height",
     "edge.angle", "edge.radius", "edge.height", "edge.width",
-    "hoop.inner.thickness", "hoop.inner.height", "hoop.outer.thickness", "hoop.outer.height", "hoop.gap",
+    "hoop.inner.thickness", "hoop.inner.height", "hoop.outer.od", "hoop.outer.thickness", "hoop.gap",
     "hoop.seat", "hoop.takeup", "hoop.ear.width", "hoop.ear.thickness",
-    "lug.pitch", "lug.height", "lug.standoff", "lug.hole_dia", "lug.rod_length",
+    "lug.pitch", "lug.height", "lug.standoff", "lug.hole_dia", "lug.rod_length", "lug.rod_head_dia", "lug.rod_head_height",
     "tube.od", "tube.thickness", "tube.length",
     "clamp.tip_thickness", "clamp.mid_thickness", "clamp.bolt_length",
     "header.thickness", "flange.thickness", "flange.bolt_seat", "flange.bolt_length", "plate.margin", "gasket.thickness",
@@ -79,6 +79,9 @@ def structure(spec: GatlingSpec) -> list[Issue]:
     t, e, h = spec.tube, spec.edge, spec.head
     if float(t.thickness) * 2 >= float(t.od):
         found.append(Issue(True, f"管の肉厚 {float(t.thickness):g} が外径 {float(t.od):g} の半分以上で、穴が無い"))
+    pipe = spec.hoop.outer
+    if float(pipe.thickness) * 2 >= float(pipe.od):
+        found.append(Issue(True, f"外リングの管の肉厚 {float(pipe.thickness):g} が外径 {float(pipe.od):g} の半分以上で、穴が無い"))
     shell_od = float(h.fit_id) - float(h.fit_clearance)   # derive() と同じ式（derive() はここでは呼ばない）
     if 2 * float(spec.shell.thickness) >= shell_od:
         found.append(Issue(True, f"胴の肉厚 {float(spec.shell.thickness):g} が胴外径 {shell_od:g} の半分以上で、穴が無い"))
@@ -178,21 +181,33 @@ def aligned(tube_count: int, lug_count: int, ear_count: int) -> list[Issue]:
 
 
 def rod_fits(spec: GatlingSpec) -> list[Issue]:
-    """ロッドが内外リングの間を通り、ラグの下端から受金の上面まで届く。
+    """テンションロッドが内外リングの間を通り、頭が受金の上面に載り、軸の先がラグにねじ込める。
 
-    内側は内リングとフレッシュフープの外面の大きいほう、外側は外リングの内面。
-    必要長は式の項を並べず、`levels()` の高さから出す（受金の上面 − ラグの下端）。その間には
-    ラグ・締め代・フレッシュフープの高さ・フープ・受金の厚みが入る（仕様 §5.3 もこの測り方で
-    書く。仕様側の直しの 6）。
+    軸の内側の相手は内リングとフレッシュフープの外面の大きいほう、外側の相手は外リングの管の内面
+    （軸が通る高さで最も軸に近い所。管の中心の高さを通れば内側の接線）。頭（受金の上面からその上）は内リングの
+    外面と、頭の高さでの管の内面の間に収まり、受金の穴より大きい（小さいと穴を抜ける）。
+    軸の先（受金の上面 − 軸の長さ）は、ラグの上端からねじ込み代（呼び径 × `MIN_ENGAGEMENT`）まで届かなければ fatal、
+    ラグの下端より下に出れば警告。頭の上面がフープの上端より上ならリムショットの邪魔なので警告。
+    必要長（受金の上面からラグの下端まで）は式の項を並べず、`levels()` の高さから出す（仕様 §5.3）。
     """
-    r, z, major = radii(spec), levels(spec), float(lookup_rod(spec.lug.thread))
+    r, z, s = radii(spec), levels(spec), spec.lug
+    major, head = float(lookup_rod(s.thread)), float(s.rod_head_dia) / 2
     # 内側の下限: ロッドはフープの高さだけでなくフレッシュフープの高さも通る。内リングを薄くして掛かりを増やすと、
     # フレッシュフープの外面のほうが外に出る
     inner, what = max((r.hoop_in_outer, "内リング"), (r.collar, "フレッシュフープ"))
     found = at_least(f"ロッドが{what}に当たる（中心半径が足りない）", r.rod - major / 2, inner)
-    found += at_most("ロッドが外リングに当たる（中心半径が大きすぎる）", r.rod + major / 2, r.hoop_out_inner)
-    need = z.ear_top - z.lug_bottom
-    return found + at_least("ロッドが短い（ラグの下端から受金の上面まで届かない）", float(spec.lug.rod_length), need)
+    found += at_most("ロッドが外リング（管）に当たる（中心半径が大きすぎる）", r.rod + major / 2,
+                     pipe_inner_radius(spec, z.rod_tip, z.ear_top))
+    if z_overlap(z.ear_top, z.rod_top, z.head_top, z.hoop_top):
+        found += at_least("ロッドの頭が内リングに当たる（頭の内縁 < 内リングの外面）", r.rod - head, r.hoop_in_outer)
+    found += at_most("ロッドの頭が外リング（管）に当たる（頭の外縁 > 頭の高さでの管の内面）", r.rod + head,
+                     pipe_inner_radius(spec, z.ear_top, z.rod_top))
+    hole = major + float(spec.hoop.ear.hole_clearance)
+    if 2 * head <= hole + EPS:
+        found.append(Issue(True, f"ロッドの頭が受金の穴を抜ける（頭の径 {2 * head:.2f} ≤ 穴径 {hole:.2f}）"))
+    found += at_most("ロッドが短い（軸の先がラグの上端からねじ込み代まで届かない）", z.rod_tip, z.lug_top - MIN_ENGAGEMENT * major)
+    found += at_least("ロッドが長い（軸の先がラグの下端より下に出る）", z.rod_tip, z.lug_bottom, fatal=False)
+    return found + at_most("ロッドの頭がフープの上端より上に出て、リムショットの邪魔になる", z.rod_top, z.hoop_top, fatal=False)
 
 
 def hoop_seat(spec: GatlingSpec) -> list[Issue]:
@@ -206,12 +221,12 @@ def spacing(spec: GatlingSpec) -> list[Issue]:
 
     幅 w の矩形を方位の線に沿って並べると、隣り合う 2 つは内側の端（半径 r0）の角で先に当たる。重ならない条件は
     w ≤ 2 × r0 × tan(180° / 個数)。ロッドの半径での弦長で比べると、内端の角の重なりを見落とす（内端はロッドより内側）。
-    受金の内端は内リングの内面、ラグの内端は胴の外面。2 個以下は向かい合うので重ならない。
+    受金の内端は内リングの外面（受金はリングの間に沈む）、ラグの内端は胴の外面。2 個以下は向かい合うので重ならない。
     """
     r = radii(spec)
     found = []
     for what, n, width, r0 in (
-        ("受金", int(float(spec.hoop.ear.count)), float(spec.hoop.ear.width), r.hoop_in_inner),
+        ("受金", int(float(spec.hoop.ear.count)), float(spec.hoop.ear.width), r.hoop_in_outer),
         ("ラグ", int(float(spec.lug.count)), 2 * float(spec.lug.standoff), r.shell),
     ):
         if n >= 3:
@@ -221,19 +236,27 @@ def spacing(spec: GatlingSpec) -> list[Issue]:
 
 
 def ear_fits(spec: GatlingSpec) -> list[Issue]:
-    """受金の幅がロッド通し穴より広い（fatal）。穴の両側に板厚ぶんの肉が無ければ警告。
+    """受金がフープの上端から突き出ず（内リングの高さの帯に収まる）、外リングの管に届く（fatal）。
+    受金の幅がロッド通し穴より広い（fatal）。穴の両側に板厚ぶんの肉が無ければ警告。
+
+    受金の下面は膜面（内リングの下端）なので、板厚がリムの高さを超えるとフープの上端から突き出て叩く邪魔になる。
+    受金の外端は管の中心半径で、管の形で切り欠く。受金の上面が管の下端以下だと管に接せず、溶接できない。
 
     幅が穴径以下だと受金が 2 片に割れるので fatal。肉の下限（穴径 + 2 × 板厚）は、打ち抜きや穴あけで縁が
     割れたり曲がったりしない一般的な目安で、受金を新しい寸法で増やさずに済むよう板厚を流用する。目安なので
     警告にとどめる（fatal にすると、板厚 8 で既定の幅 20 が出力できなくなる）。`plate.margin`（8）は削り出しの
     板の縁で、既定の幅 20 では足りない（6.5 + 16 = 22.5）ので使わない。
     """
-    e = spec.hoop.ear
+    e, z = spec.hoop.ear, levels(spec)
+    found = at_most("受金がフープの上端から突き出る（受金の上面 > フープの上端。板厚がリムの高さを超える）", z.ear_top, z.hoop_top)
+    pipe_bottom = z.hoop_top - float(spec.hoop.outer.od)
+    if z.ear_top <= pipe_bottom + EPS:
+        found.append(Issue(True, f"受金が外リング（管）に届かない（受金の上面 {z.ear_top:.2f} ≤ 管の下端 {pipe_bottom:.2f}）"))
     hole = float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)
     width = float(e.width)
     if width <= hole + EPS:
-        return [Issue(True, f"受金の幅がロッド通し穴の径以下で、受金が 2 片に割れる（{width:.2f} ≤ {hole:.2f}）")]
-    return at_least("受金の幅がロッド通し穴の両側の肉（板厚）に足りない（穴径 + 2 × 板厚）", width,
+        return found + [Issue(True, f"受金の幅がロッド通し穴の径以下で、受金が 2 片に割れる（{width:.2f} ≤ {hole:.2f}）")]
+    return found + at_least("受金の幅がロッド通し穴の両側の肉（板厚）に足りない（穴径 + 2 × 板厚）", width,
                      hole + 2 * float(e.thickness), fatal=False)
 
 
@@ -249,12 +272,20 @@ def lug_fits(spec: GatlingSpec) -> list[Issue]:
 
 
 def cradle_fits(spec: GatlingSpec) -> list[Issue]:
-    """クレードルとフープの逃げ（負なら fatal、小さければ警告）、脚の高さ、胴バンド・耳・クレードルの下でフランジのボルトを抜けること。"""
+    """クレードルとフープの逃げ（負なら fatal、小さければ警告）、脚の高さ、胴バンド・耳・クレードルの下でフランジのボルトを抜けること。
+
+    フープの逃げは、フレームと z の範囲が重なるリング（内リング、外リングの管）だけを見る（`interference.hoop_rings`）。
+    既定ではフレームはプレナム胴の高さにあり、フープより下なので、管の外面がフレームの内面より外に出ていてもよい。
+    """
     z, r, c = levels(spec), radii(spec), spec.cradle
-    clearance = r.frame_inner - r.hoop_out_outer
-    found = at_least("クレードルがフープの外径と干渉する（フレーム内面と外リング外面の逃げ）", clearance, 0.0)
-    if not found:
-        found = at_least("クレードルとフープの逃げが小さい", clearance, MIN_CRADLE_CLEARANCE, fatal=False)
+    frame_z = (z.frame_centre - float(c.bar.thickness) / 2, z.frame_top)
+    found = []
+    for name, radius, z0, z1 in hoop_rings(spec):
+        if not z_overlap(z0, z1, *frame_z):
+            continue
+        clearance = r.frame_inner - radius
+        hit = at_least(f"クレードルがフープの外径と干渉する（フレーム内面と{name}外面の逃げ）", clearance, 0.0)
+        found += hit or at_least(f"クレードルとフープの逃げが小さい（フレーム内面と{name}外面）", clearance, MIN_CRADLE_CLEARANCE, fatal=False)
     leg = z.frame_centre - float(c.bar.thickness) / 2 - z.band_centre
     found += at_least("クレードルの脚の高さが無い（フレームがバンドより上になければならない）", leg, EPS)
     return found + flange_bolts_removable(spec)
@@ -293,9 +324,10 @@ def bolt_lengths(spec: GatlingSpec) -> list[Issue]:
 
 
 def stock_warning(spec: GatlingSpec) -> list[Issue]:
-    """管の外径・肉厚が規格からずれていれば警告（`stock.nearest`）。"""
-    _, issue = nearest(float(spec.tube.od), float(spec.tube.thickness))
-    return [issue] if issue else []
+    """管束の管と外リングの管の外径・肉厚が規格からずれていれば警告（`stock.nearest`）。"""
+    _, tube = nearest(float(spec.tube.od), float(spec.tube.thickness))
+    _, pipe = nearest(float(spec.hoop.outer.od), float(spec.hoop.outer.thickness))
+    return ([tube] if tube else []) + ([Issue(False, f"外リングの管: {pipe.what}")] if pipe else [])
 
 
 def issues(spec: GatlingSpec) -> list[Issue]:

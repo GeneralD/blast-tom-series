@@ -20,6 +20,24 @@ from .placement import (band_tab_length, cradle_corner, cradle_y_rear, flange_bo
 from .planar import EPS, Point, circle_overlaps, origin_distance, polygons_overlap, rect, square_reach, z_overlap
 
 ARM_ANGLES = (45, 135, 225, 315)      # クレードルの腕の方位（対角線）
+# ラグより下にある胴まわりの回転体。軸の先がラグの下端より下に出る（警告）と当たりうる。フープとフレッシュフープは
+# `rod_fits` が、胴・エッジ環はロッドが胴の外にあること（`rod_fits` の内側の下限 ≥ フレッシュフープの外面 > 胴の外面）が見る
+_OUTSIDE_THE_LUG = ("胴バンド", "フランジ・ヘッダープレート")
+
+
+def hoop_rings(spec: GatlingSpec) -> list[tuple[str, float, float, float]]:
+    """フープの回転体の外半径と z の範囲（名前, 外半径, 下端, 上端）。
+
+    外リングは管の環なので、外半径は管の外面、z は管の上端（= 内リングの上端）から下端まで。受金は内リングの外面から
+    管の中心まで伸びる板で、外半径は外端の隅（管の中心半径と幅の半分の斜辺）。受金の z は外リングの範囲から外れうる
+    （管が細くリムが深いと、受金の下面 = 膜面が管の下端より下になる）ので、別に持つ。
+    """
+    z, r = levels(spec), radii(spec)
+    return [
+        ("内リング", r.hoop_in_outer, z.head_top, z.hoop_top),
+        ("外リング（管）", r.hoop_out_outer, z.hoop_top - float(spec.hoop.outer.od), z.hoop_top),
+        ("受金", math.hypot(r.hoop_out_centre, float(spec.hoop.ear.width) / 2), z.ear_bottom, z.ear_top),
+    ]
 
 
 def _round_parts(spec: GatlingSpec) -> list[tuple[str, float, float, float]]:
@@ -28,8 +46,7 @@ def _round_parts(spec: GatlingSpec) -> list[tuple[str, float, float, float]]:
     return [
         ("胴・エッジ環", r.shell, z.flange_top, z.edge_top),
         ("フレッシュフープ", r.collar, z.collar_bottom, z.head_top),
-        ("内リング", r.hoop_in_outer, z.head_top, z.hoop_top),
-        ("外リング", r.hoop_out_outer, z.hoop_top - float(spec.hoop.outer.height), z.hoop_top),
+        *hoop_rings(spec),
         ("胴バンド", r.band_outer, z.band_bottom, z.band_top),
         ("フランジ・ヘッダープレート", float(derive(spec).plate_od) / 2, z.header_bottom, z.flange_top),
     ]
@@ -82,10 +99,9 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
         if z_overlap(z0, z1, *pad_z) and origin_distance(pad) < radius - EPS:
             found.append(Issue(True, f"当て板が{name}に食い込む（平面視で内縁 {origin_distance(pad):.2f} < 外半径 {radius:.2f}、z も重なる）"))
     box, rod_r = lug_box(spec), float(lookup_rod(spec.lug.thread)) / 2
-    lug_z, rod_z = (z.lug_bottom, z.lug_top), (z.lug_bottom, z.lug_bottom + float(spec.lug.rod_length))
-    # ロッドとホルダー受けは見ない。ロッドはラグの箱の中を通り（`rod_fits` が通れば、平面視でラグに含まれる）、ホルダー受けは当て板に
-    # 載る（`holder_fits`。平面視で当て板に含まれる）。ロッドの z はラグの下端から始まるので、ロッドがホルダー受けの
-    # z にかかれば、ラグがホルダー受けの z にかかるか、ロッドが当て板の z にかかる。どちらも先に止まる。
+    # ロッドは軸の先から頭の上面まで（平面視は軸の径で見る。頭は内外リングの間にあり、`rod_fits` が見る）。
+    # 軸の先はラグの下端より下に出うる（警告）ので、ラグの外の部品（胴バンド・フランジ・腕・耳・フレーム・当て板・ホルダー受け）とも見る
+    lug_z, rod_z = (z.lug_bottom, z.lug_top), (z.rod_tip, z.rod_top)
     # クレードル: フレームの内面（正方形の半幅 frame_inner）、腕（`_arms`、厚みの中心はバンドの中心）。
     # 脚はフレームの内面より外、フレームの下にあり、ラグの上端はフレームより上なので、脚に届くラグはフレームの z にも
     # かかって内面の外に出る（フレームの検査で止まる）。
@@ -103,9 +119,17 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
             ("ラグがホルダー受けに当たる", z_overlap(*lug_z, *holder_z) and circle_overlaps((0.0, y0), rb, lug)),
             ("ラグが当て板に当たる", z_overlap(*lug_z, *pad_z) and polygons_overlap(lug, pad)),
             ("ロッドが当て板に当たる", z_overlap(*rod_z, *pad_z) and circle_overlaps(rod, rod_r, pad)),
+            ("ロッドがホルダー受けに当たる", z_overlap(*rod_z, *holder_z) and math.dist(rod, (0.0, y0)) < rod_r + rb - EPS),
             ("ラグがクレードルのフレームの内面から外に出て当たる", z_overlap(*lug_z, *frame_z) and square_reach([lug]) > r.frame_inner + EPS),
             ("ラグがクレードルの腕に当たる", z_overlap(*lug_z, *arm_z) and any(polygons_overlap(lug, arm) for arm in arms)),
             ("ラグが胴バンドの耳（ボルトの頭を含む）に当たる", z_overlap(*lug_z, *tab_z) and any(polygons_overlap(lug, tab) for tab in tabs)),
+            ("ロッドがクレードルのフレームの内面から外に出て当たる",
+             z_overlap(*rod_z, *frame_z) and max(abs(rod[0]), abs(rod[1])) + rod_r > r.frame_inner + EPS),
+            ("ロッドがクレードルの腕に当たる", z_overlap(*rod_z, *arm_z) and any(circle_overlaps(rod, rod_r, arm) for arm in arms)),
+            ("ロッドが胴バンドの耳（ボルトの頭を含む）に当たる",
+             z_overlap(*rod_z, *tab_z) and any(circle_overlaps(rod, rod_r, tab) for tab in tabs)),
+            *((f"ロッドが{name}に当たる", z_overlap(*rod_z, z0, z1) and r.rod - rod_r < radius - EPS)
+              for name, radius, z0, z1 in _round_parts(spec) if name in _OUTSIDE_THE_LUG),
         ):
             if hit:
                 hits.setdefault(what, []).append(a)

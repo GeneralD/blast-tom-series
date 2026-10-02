@@ -19,17 +19,26 @@ def test_the_default_mount_passes_with_no_warning():
     assert cradle_fits(SPEC) == [] and holder_fits(SPEC) == [] and bolt_lengths(SPEC) == [] and stock_warning(SPEC) == []
 
 
+_LOW = {"shell.plenum_height": 10}      # フレーム（z 9〜15）が外リングの管（z 13.79〜39.19）と同じ高さに来る
+
+
+def test_a_frame_below_the_hoop_does_not_need_to_clear_it():
+    """既定ではフレームの内面 98 < 管の外面 116.1 だが、フレーム（z 54〜60）は管（z 103.79〜129.19）より下にある。"""
+    assert cradle_fits(SPEC) == []
+
+
 def test_a_frame_that_cuts_into_the_outer_ring_is_fatal():
-    # フレーム内面 = 83 + 逃げ、外リング外面 = 90.7。逃げ 7.7 未満は負
-    assert any("干渉" in w for w in _fatal(cradle_fits(override(SPEC, cradle__clearance=7.5))))
-    assert not any("干渉" in w for w in _fatal(cradle_fits(override(SPEC, cradle__clearance=7.7))))
+    # z が重なるとき: フレーム内面 = 83 + 逃げ、管の外面 = 116.1。逃げ 33.1 未満は負
+    assert any("干渉" in w and "外リング" in w for w in _fatal(cradle_fits(override(SPEC, **_LOW))))
+    assert any("干渉" in w for w in _fatal(cradle_fits(override(SPEC, cradle__clearance=33, **_LOW))))
+    assert not any("干渉" in w for w in _fatal(cradle_fits(override(SPEC, cradle__clearance=33.1, **_LOW))))
 
 
 def test_a_frame_that_only_just_clears_the_ring_is_a_warning():
     assert MIN_CRADLE_CLEARANCE == 5.0
-    found = cradle_fits(override(SPEC, cradle__clearance=12.5))          # 逃げ 4.8
-    assert _fatal(found) == [] and "逃げが小さい" in _warn(found)[0]
-    assert cradle_fits(override(SPEC, cradle__clearance=12.7)) == []      # 5.0 ちょうどは通す
+    found = cradle_fits(override(SPEC, cradle__clearance=37.9, **_LOW))          # 逃げ 4.8
+    assert not any("干渉" in w for w in _fatal(found)) and any("逃げが小さい" in w for w in _warn(found))
+    assert not any("逃げ" in w for w in _warn(cradle_fits(override(SPEC, cradle__clearance=38.1, **_LOW))))   # 5.0 ちょうどは通す
 
 
 def test_the_frame_must_be_above_the_band_so_the_legs_have_a_height():
@@ -140,6 +149,12 @@ def test_a_band_gap_so_wide_that_the_tabs_leave_the_half_rings_is_fatal():
 def test_the_band_bolt_engagement_counts_the_gap_between_the_tabs():
     found = bolt_lengths(override(SPEC, band__gap=3))                     # ねじ込み 12 − 6 − 3 = 3 < 4.5
     assert _fatal(found) == [] and any("胴バンド" in w and "ねじ込み" in w for w in _warn(found))
+
+
+def test_a_hoop_pipe_off_the_standard_sizes_is_only_a_warning():
+    found = stock_warning(override(SPEC, hoop__outer__od=29))
+    assert len(found) == 1 and not found[0].fatal and "外リング" in found[0].what and "規格径" in found[0].what
+    assert stock_warning(override(SPEC, hoop__outer__od=31.8)) == []                  # 規格にある
 
 
 def test_a_tube_off_the_standard_sizes_is_only_a_warning():

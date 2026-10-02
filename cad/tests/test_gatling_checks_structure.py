@@ -37,7 +37,8 @@ def test_a_choice_that_is_not_in_the_standard_table_is_fatal(path, value):
     assert any(path in w and "規格表" in w for w in found), found
 
 
-@pytest.mark.parametrize("path", ["tube.od", "tube.length", "shell.plenum_height", "header.thickness", "cradle.bar.width", "head.fit_id"])
+@pytest.mark.parametrize("path", ["tube.od", "tube.length", "shell.plenum_height", "header.thickness", "cradle.bar.width", "head.fit_id",
+                                  "hoop.outer.od", "hoop.outer.thickness", "lug.rod_head_dia", "lug.rod_head_height"])
 def test_a_dimension_that_is_zero_or_negative_is_fatal(path):
     for bad in (0, -1):
         assert any(path in w and "正" in w for w in _fatal(override(SPEC, **{path: bad}))), (path, bad)
@@ -50,6 +51,11 @@ def test_a_clearance_may_be_zero_but_not_negative():
 
 def test_a_tube_wall_that_leaves_no_bore_is_fatal():
     assert any("肉厚" in w for w in _fatal(override(SPEC, tube__thickness=19.05)))
+
+
+def test_a_hoop_pipe_wall_that_leaves_no_bore_is_fatal():
+    assert any("外リング" in w and "肉厚" in w for w in _fatal(override(SPEC, hoop__outer__thickness=12.7)))
+    assert not any("外リング" in w for w in _fatal(override(SPEC, hoop__outer__thickness=12.6)))
 
 
 @pytest.mark.parametrize("changes", [
