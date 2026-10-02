@@ -253,7 +253,7 @@ def ear_fits(spec: GatlingSpec) -> list[Issue]:
     """
     e, z = spec.hoop.ear, levels(spec)
     found = at_most("受金がフープの上端から突き出る（受金の上面 > フープの上端）", z.ear_top, z.hoop_top)
-    weld = min(z.ear_top, z.hoop_top) - max(z.ear_bottom, z.head_top)
+    weld = z.ear_top - max(z.ear_bottom, z.head_top)
     if weld <= EPS:
         found.append(Issue(True, f"受金が内リングに溶接できない（受金と内リングの z の重なり {weld:.2f} ≤ 0。リムが浅いか、受金が下すぎる）"))
     else:

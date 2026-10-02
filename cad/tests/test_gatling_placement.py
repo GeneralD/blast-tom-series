@@ -68,7 +68,7 @@ def test_the_rim_is_shallow_and_the_pipe_ring_hangs_from_the_same_top():
     z = levels(SPEC)
     assert z.hoop_top == pytest.approx(z.head_top + 8)                        # リムの高さ 8
     assert z.pipe_centre == pytest.approx(z.hoop_top - 25.4 / 2)               # 管の上端 = 内リングの上端
-    assert z.hoop_bottom == pytest.approx(z.hoop_top - 25.4)                   # 下端は管の下端（103.79）
+    assert z.hoop_bottom == pytest.approx(z.hoop_top - 25.4)                   # 下端は管の下端（99.79）
     assert z.hoop_bottom < z.head_top
     thin = levels(override(SPEC, hoop__outer__od=6))
     assert thin.hoop_bottom == pytest.approx(thin.head_top)                    # 管がリムより細ければ、内リングの下面が下端

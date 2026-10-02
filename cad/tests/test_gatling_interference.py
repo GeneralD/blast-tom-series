@@ -45,7 +45,7 @@ from gatling_overlap import overlaps
     {"cradle.clearance": 5, "cradle.pad.depth": 40, "cradle.pad.width": 40, "cradle.bar.thickness": 5,   # 22. 軸とクレードルのフレーム
      "lug.rod_length": 60.8},
     {"hoop.outer.od": 10, "mount.body_height": 48.3},                                                 # 23. ホルダー受けと受金
-    {"hoop.inner.thickness": 0.9},                                                                    # 24. 受金とフレッシュフープ（内リングが薄い）
+    {"hoop.inner.thickness": 0.9, "lug.standoff": 6, "lug.rod_head_dia": 7},                                                                 # 24. 受金とフレッシュフープ（内リングが薄い）
 ])
 def test_an_override_that_breaks_the_shape_is_fatal(values):
     assert fatal_count(issues(override(SPEC, **values))) >= 1, values
