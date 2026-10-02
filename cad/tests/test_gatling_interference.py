@@ -36,6 +36,13 @@ from gatling_overlap import overlaps
     {"lug.rod_length": 28.5},                                                                         # 16. ロッドがラグに届かない
     {"shell.plenum_height": 10},                                                                      # 17. フレームと外リング（管）
     {"lug.rod_length": 85},                                                                           # 18. ラグの下に出た軸と胴バンドの耳
+    {"lug.count": 24, "hoop.ear.count": 24, "cradle.clearance": 31, "cradle.bar.thickness": 40,       # 19. ラグの下に出た軸とクレードルの腕
+     "mount.body_height": 20, "lug.rod_length": 72},
+    {"lug.standoff": 9.5, "lug.rod_length": 79.5},                                                    # 20. 軸と胴バンド
+    {"lug.count": 12, "hoop.ear.count": 12, "cradle.clearance": 13,                                  # 21. 軸とホルダー受け
+     "cradle.pad.thickness": 1, "mount.body_height": 2, "lug.rod_length": 61},
+    {"cradle.clearance": 5, "cradle.pad.depth": 40, "cradle.pad.width": 40, "lug.rod_length": 64},    # 22. 軸とクレードルのフレーム
+    {"hoop.outer.od": 10, "mount.body_height": 51.5},                                                 # 23. ホルダー受けと受金
 ])
 def test_an_override_that_breaks_the_shape_is_fatal(values):
     assert fatal_count(issues(override(SPEC, **values))) >= 1, values
@@ -54,6 +61,13 @@ def test_an_override_that_breaks_the_shape_is_fatal(values):
     {"hoop.ear.thickness": 12, "hoop.outer.od": 12.1, "lug.rod_head_height": 0.5},                    # 14 の内側（受金がリムいっぱい、管に届く）
     {"lug.rod_head_dia": 10.6, "lug.rod_length": 28.53},                                              # 15・16 の内側
     {"lug.rod_length": 79},                                                                           # 18 の内側（ラグの下に出るのは警告だけ）
+    {"lug.count": 24, "hoop.ear.count": 24, "cradle.clearance": 31, "cradle.bar.thickness": 40,       # 19 の内側
+     "mount.body_height": 20, "lug.rod_length": 71.5},
+    {"lug.standoff": 9.5, "lug.rod_length": 79},                                                      # 20 の内側
+    {"lug.count": 12, "hoop.ear.count": 12, "cradle.clearance": 13,                                  # 21 の内側
+     "cradle.pad.thickness": 1, "mount.body_height": 2, "lug.rod_length": 60},
+    {"cradle.clearance": 5, "cradle.pad.depth": 40, "cradle.pad.width": 40, "lug.rod_length": 63},    # 22 の内側
+    {"hoop.outer.od": 10, "mount.body_height": 51},                                                   # 23 の内側
 ])
 def test_an_override_just_inside_the_checks_builds_without_any_overlap(values):
     spec = override(SPEC, **values)
