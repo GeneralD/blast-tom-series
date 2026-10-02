@@ -30,6 +30,12 @@ class PartInfo:
     explode: tuple[float, float, float] = (0.0, 0.0, 0.0)   # viewer の分解の方向と相対距離（単位ベクトルではない。長さが分解の距離の比）
     standard: str = ""             # BOM「規格・型番の系統」。製作品の行は機種がここに書く
     dimensions: str = ""           # BOM「寸法」（例: φ38.1 × t1.2 × L450）。同上
+    opacity: float = 1.0           # viewer の不透明度（0 < opacity ≤ 1）。1 未満は半透明に描く。見た目だけで、形・質量・BOM には効かない
+
+    def __post_init__(self) -> None:
+        # nan は比較がすべて偽になるので、「範囲内」を肯定形で書いて弾く
+        if not 0 < self.opacity <= 1:
+            raise ValueError(f"部品 {self.label} の opacity {self.opacity} は 0 より大きく 1 以下でなければならない")
 
 
 @dataclass(frozen=True)
@@ -39,7 +45,7 @@ class BomRow:
     name: str
     made: Made
     material: Material | None
-    standard: str          # 規格・型番の系統（例: DW タレットラグ、手すり用 #400 研磨管）
+    standard: str          # 規格・型番の系統（例: 円筒ラグ、手すり用 #400 研磨管）
     dimensions: str        # 例: φ38.1 × t1.2 × L450
     count: int
     part_number: str = ""

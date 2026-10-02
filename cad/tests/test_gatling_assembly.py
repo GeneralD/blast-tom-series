@@ -120,3 +120,11 @@ def test_no_two_parts_overlap_except_a_bolt_in_its_tapped_hole(built):
         if shapes[a].intersect(shapes[b]).Volume() > 1e-3:
             overlaps.append((a, b))
     assert overlaps == []
+
+
+def test_the_head_is_drawn_red_and_half_transparent_and_every_other_part_stays_opaque():
+    """ヘッドは既製品で、赤の半透明は見た目のイメージ。型番・膜厚などの値は変えない。"""
+    info = {p.name: p for p in parts(SPEC)}
+    assert info["head"].color == "#d0121b" and info["head"].opacity == 0.5
+    assert {k for k, v in info.items() if v.opacity != 1.0} == {"head"}
+    assert info["head"].standard == SPEC.head.model.value and info["head"].made == "purchased"

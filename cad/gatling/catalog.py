@@ -14,6 +14,10 @@ SILICONE = Material("シリコーンゴム", 1.2e-3)                       # g/m
 PURCHASED = Material("既製品（材質は実物で確認）", 0.0)               # 既製品の質量は部品表に載せない
 
 
+HEAD_COLOR = "#d0121b"                                                # viewer のヘッドの色（見た目のイメージ）
+HEAD_OPACITY = 0.5                                                   # 半透明にして、下のフープと胴が見えるようにする
+
+
 def fmt(value: float) -> str:
     return f"{float(value):g}"
 
@@ -33,11 +37,13 @@ def parts(spec: GatlingSpec) -> list[PartInfo]:
     def fab(name, label, color, count, section, explode, standard, dimensions, material=SUS304):
         return PartInfo(name, label, color, material, "fabricated", count, section, explode, standard, dimensions)
 
-    def buy(name, label, color, count, explode, standard, dimensions=""):
-        return PartInfo(name, label, color, PURCHASED, "purchased", count, "none", explode, standard, dimensions)
+    def buy(name, label, color, count, explode, standard, dimensions="", opacity=1.0):
+        return PartInfo(name, label, color, PURCHASED, "purchased", count, "none", explode, standard, dimensions, opacity)
 
     return [
-        buy("head", "ヘッド 6\"", "#e9e4d4", 1, (0, 0, 1.2), spec.head.model.value, f"フレッシュフープ内径 φ{fmt(spec.head.fit_id)}"),
+        # ヘッドは既製品。赤の半透明は見た目のイメージで、型番・膜厚・面密度とは関係ない
+        buy("head", "ヘッド 6\"", HEAD_COLOR, 1, (0, 0, 1.2), spec.head.model.value, f"フレッシュフープ内径 φ{fmt(spec.head.fit_id)}",
+            opacity=HEAD_OPACITY),
         fab("hoop_inner", "内リング", "#aab4c0", 1, "radial", (0, 0, 0.8), f"{bar}を丸めて TIG 突合せ",
             f"内径 φ{fmt(2 * r.hoop_in_inner)} × 幅{fmt(spec.hoop.inner.height)} × t{fmt(spec.hoop.inner.thickness)}"),
         fab("hoop_outer", "外リング（質量リング）", "#9aa5b3", 1, "radial", (0, 0, 0.8), f"{hoop_stock.family}を曲げて TIG 突合せ",

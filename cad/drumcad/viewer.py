@@ -43,7 +43,7 @@ def _label(info: PartInfo) -> str:
 def viewer_data(title: str, note: str, parts: dict[str, cq.Workplane],
                 infos: dict[str, PartInfo]) -> dict:
     meshes = [{"name": name, "label": _label(infos[name]), "color": infos[name].color,
-               "explode": list(infos[name].explode), **mesh(part)}
+               "explode": list(infos[name].explode), "opacity": float(infos[name].opacity), **mesh(part)}
               for name, part in parts.items()]
     xyz = [m["positions"] for m in meshes]
     return {
@@ -136,10 +136,13 @@ _TEMPLATE = """<!doctype html>
     g.setAttribute("position", new THREE.Float32BufferAttribute(p.positions, 3));
     g.setIndex(p.indices);
     g.computeVertexNormals();
+    // 不透明度が 1 未満の部品（既製品の見た目のイメージ）は半透明で描き、奥の部品を隠さないよう深度を書かない
     const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
-      color: p.color, metalness: 0.55, roughness: 0.45, flatShading: true, side: THREE.DoubleSide }));
+      color: p.color, metalness: 0.55, roughness: 0.45, flatShading: true, side: THREE.DoubleSide,
+      transparent: p.opacity < 1, opacity: p.opacity, depthWrite: p.opacity >= 1 }));
     const e = new THREE.LineSegments(new THREE.EdgesGeometry(g, 15),
-                                     new THREE.LineBasicMaterial({ color: p.color }));
+                                     new THREE.LineBasicMaterial({ color: p.color,
+                                       transparent: p.opacity < 1, opacity: p.opacity, depthWrite: p.opacity >= 1 }));
     e.visible = false;
     scene.add(m, e);
     const it = { mesh: m, edges: e, on: true, explode: new THREE.Vector3(...p.explode) };
@@ -152,6 +155,7 @@ _TEMPLATE = """<!doctype html>
     const swatch = document.createElement("span");
     swatch.className = "sw";
     swatch.style.background = p.color;
+    swatch.style.opacity = p.opacity;
     row.append(box, swatch, document.createTextNode(p.label));
     partsBox.appendChild(row);
   }

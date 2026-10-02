@@ -78,3 +78,39 @@ def test_the_html_is_self_contained_except_for_three_js(demo):
     assert srcs == [THREE_JS]
     assert not re.search(r'<link[^>]*href="https?://', html)
     assert 'id="explode"' in html
+
+
+def test_a_part_opacity_is_embedded_and_defaults_to_opaque():
+    m = discover(TESTS)["demo"]
+    infos = {p.name: p for p in m.parts()}
+    infos["plate"] = replace(infos["plate"], opacity=0.5)
+    html = viewer_html("t", "n", m.assembly(), infos)
+    by = {p["name"]: p for p in _embedded(html)["parts"]}
+    assert by["plate"]["opacity"] == 0.5
+    assert by["shell"]["opacity"] == 1.0 and by["stud"]["opacity"] == 1.0     # 既定は不透明のまま
+
+
+def test_the_viewer_draws_a_translucent_part_without_writing_depth_and_keeps_opaque_ones_as_before(demo):
+    _, _, html = demo
+    assert "transparent: p.opacity < 1" in html and "depthWrite: p.opacity >= 1" in html
+    assert "opacity: p.opacity" in html
+    assert "transparent: true" not in html                                       # 不透明の部品に透明を掛けない
+
+
+def test_the_wireframe_lines_and_the_legend_swatch_follow_the_part_opacity(demo):
+    _, _, html = demo
+    assert re.search(r"LineBasicMaterial\(\{[^}]*opacity: p\.opacity", html)
+    assert "swatch.style.opacity = p.opacity" in html
+
+
+@pytest.mark.parametrize("bad", [0, -0.1, 1.01, 2, float("nan"), float("inf")])
+def test_an_opacity_out_of_range_is_rejected(bad):
+    info = next(iter(discover(TESTS)["demo"].parts()))
+    with pytest.raises(ValueError, match="opacity"):
+        replace(info, opacity=bad)
+
+
+@pytest.mark.parametrize("ok", [0.01, 0.5, 1, 1.0])
+def test_an_opacity_in_range_is_accepted(ok):
+    info = next(iter(discover(TESTS)["demo"].parts()))
+    assert replace(info, opacity=ok).opacity == ok
