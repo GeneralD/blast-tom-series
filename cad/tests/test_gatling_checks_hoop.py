@@ -42,36 +42,39 @@ def test_a_ring_gap_too_narrow_for_the_rod_is_fatal():
 
 
 def test_the_rod_shaft_must_thread_into_the_lug_by_the_engagement():
-    """軸の先 = 受金の上面 123.19 − rod_length。ラグの上端 98.79 からねじ込み代 0.75 × 5.5 = 4.125 まで届く最短は 28.525。"""
+    """軸の先 = 受金の上面 120.19 − rod_length。ラグの上端 94.79 からねじ込み代 0.75 × 5.5 = 4.125 まで届く最短は 29.525。"""
     z = levels(SPEC)
-    assert z.ear_top - z.lug_top + 0.75 * 5.5 == pytest.approx(28.525)
-    assert any("ロッドが短い" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_length=28.5))))
-    assert _fatal(rod_fits(override(SPEC, lug__rod_length=28.53))) == []
+    assert z.ear_top - z.lug_top + 0.75 * 5.5 == pytest.approx(29.525)
+    assert any("ロッドが短い" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_length=29.5))))
+    assert _fatal(rod_fits(override(SPEC, lug__rod_length=29.53))) == []
 
 
 @pytest.mark.parametrize("path, value", [
     ("hoop.takeup", 27),               # ラグ全体が下がる
     ("hoop.outer.od", 48),             # 管が下へ垂れ、ラグも下がる
-    ("head.collar_height", 35),        # フレッシュフープの下端が管より下がり、ラグも下がる
+    ("head.collar_height", 60),        # フレッシュフープの下端が管より下がり、ラグも下がる
 ])
 def test_the_shortest_rod_follows_every_height_between_the_ear_and_the_lug(path, value):
     assert any("ロッドが短い" in w for w in _fatal(rod_fits(override(SPEC, **{path: value})))), path
 
 
 def test_a_rod_that_runs_out_of_the_lug_bottom_is_a_warning():
-    """必要長（受金の上面からラグの下端まで）= 6 + 13.4 + 5 + 35 = 59.4。軸の先がこれより下に出ると警告。"""
+    """必要長（受金の上面からラグの下端まで）= 25.4 − 5 + 5 + 35 = 60.4。軸の先がこれより下に出ると警告。"""
     z = levels(SPEC)
-    assert z.ear_top - z.lug_bottom == pytest.approx(59.4)
-    found = rod_fits(override(SPEC, lug__rod_length=59.5))
+    assert z.ear_top - z.lug_bottom == pytest.approx(60.4)
+    found = rod_fits(override(SPEC, lug__rod_length=60.5))
     assert not _fatal(found) and any("ラグの下端" in i.what for i in found)
-    assert rod_fits(override(SPEC, lug__rod_length=59.4)) == []
+    assert rod_fits(override(SPEC, lug__rod_length=60.4)) == []
 
 
-def test_a_rod_head_above_the_hoop_top_is_a_warning():
-    """頭の上面 = 受金の上面 123.19 + 頭の高さ。フープの上端 129.19 を超えるとリムショットの邪魔になる。"""
-    found = rod_fits(override(SPEC, lug__rod_head_height=6.1))
-    assert not _fatal(found) and any("リムショット" in i.what for i in found)
-    assert rod_fits(override(SPEC, lug__rod_head_height=6)) == []
+def test_the_rod_head_top_sits_exactly_at_the_hoop_top_so_it_never_warns_about_the_rim():
+    """受金の上面 = フープの上端 − 頭の高さなので、頭の上面は頭の高さによらずフープの上端に揃う（縁ちょうどは通す）。
+    リムショットの警告は、受金の位置を別に決める設計に戻したときのために残してある。"""
+    for height in (1, 5, 7.9):
+        spec = override(SPEC, lug__rod_head_height=height)
+        z = levels(spec)
+        assert z.rod_top == pytest.approx(z.hoop_top), height
+        assert not any("リムショット" in i.what for i in rod_fits(spec)), height
 
 
 def test_the_rod_head_must_clear_the_inner_ring():
@@ -81,10 +84,10 @@ def test_the_rod_head_must_clear_the_inner_ring():
 
 
 def test_the_rod_head_must_clear_the_pipe():
-    """standoff 11.5 でロッド中心 87.5。頭の高さ（受金の上面から上）での管の内面は 92.61 なので、頭の径は 10.22 まで。"""
+    """standoff 11.5 でロッド中心 87.5。頭の高さ（受金の上面 120.19 から上）での管の内面は 93.30 なので、頭の径は 11.60 まで。"""
     out = {"lug.standoff": 11.5}
-    assert any("頭" in w and "外リング（管）" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=11, **out))))
-    assert not any("頭" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=10.2, **out))))
+    assert any("頭" in w and "外リング（管）" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=11.7, **out))))
+    assert not any("頭" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=11.5, **out))))
 
 
 def test_a_rod_head_no_larger_than_the_ear_hole_falls_through():
@@ -93,18 +96,18 @@ def test_a_rod_head_no_larger_than_the_ear_hole_falls_through():
 
 
 def test_a_lug_that_hangs_onto_the_band_is_fatal():
-    # ラグの上端 98.79。高さ 54.79 で下端がバンド上端 44 にちょうど届く
-    assert any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__height=54.9))))
-    assert not any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__height=54.7))))
+    # ラグの上端 94.79。高さ 50.79 で下端がバンド上端 44 にちょうど届く
+    assert any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__height=50.9))))
+    assert not any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__height=50.7))))
 
 
 def test_mounting_holes_that_run_past_the_ends_of_the_shell_are_fatal():
-    assert any("上端" in w for w in _fatal(lug_fits(override(SPEC, lug__pitch=60))))        # 81.29 + 32.5 > 107
+    assert any("上端" in w for w in _fatal(lug_fits(override(SPEC, lug__pitch=60))))        # 77.29 + 32.5 > 107
     assert any("下端" in w for w in _fatal(lug_fits(override(SPEC, lug__height=100, lug__pitch=100))))
 
 
 def test_mounting_holes_must_fall_inside_the_lug_body():
-    # ラグ z 63.79〜98.79（中央 81.29）。穴の外縁 = 中央 ± (pitch / 2 + 穴径 / 2) が収まるのは pitch + 穴径 ≤ 35 まで
+    # ラグ z 59.79〜94.79（中央 77.29）。穴の外縁 = 中央 ± (pitch / 2 + 穴径 / 2) が収まるのは pitch + 穴径 ≤ 35 まで
     assert any("ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__pitch=31))))
     assert not any("ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__pitch=30))))
     assert any("ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__pitch=40))))      # 高さ 35 を超えるピッチ
@@ -138,25 +141,25 @@ def test_a_thin_wall_beside_the_rod_hole_is_only_a_warning():
 
 
 def test_the_ear_walls_beside_the_rod_hole_are_fatal_when_the_hole_breaks_out_of_the_plate():
-    """肉 = 内側は (ロッド − 穴径 / 2) − 内リングの外面（80.7）、外側は受金の z 帯での管の内面（90.72）− (ロッド + 穴径 / 2)。
-    穴の半径 3.25。ロッドの半径 = 76 + standoff。内側は 84 で 0.05、83.9 で負。外側は 87.4 で 0.07、87.5 で負。"""
+    """肉 = 内側は (ロッド − 穴径 / 2) − 内リングの外面（80.7）、外側は受金の z 帯 [114.19, 120.19] での管の内面（90.81）− (ロッド + 穴径 / 2)。
+    穴の半径 3.25。ロッドの半径 = 76 + standoff。内側は 84 で 0.05、83.9 で負。外側は 87.5 で 0.06、87.6 で負。"""
     assert any("内側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=7.9))))
     assert not any("内側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=8.0))))
-    assert any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.5))))
-    assert not any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.4))))
+    assert any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.6))))
+    assert not any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.5))))
     assert any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.7))))        # 穴が受金の外端（管の切り欠き）を破る
 
 
 def test_a_thin_radial_wall_beside_the_rod_hole_is_only_a_warning():
-    """径方向の肉は、穴の両側が溶接でリングに支えられるので、板厚（6）の半分の 3 mm を目安にする。既定は内側 2.05・外側 1.47 で警告。
+    """径方向の肉は、穴の両側が溶接でリングに支えられるので、板厚（6）の半分の 3 mm を目安にする。既定は内側 2.05・外側 1.56 で警告。
     リングの間（gap）を 4 広げ、ロッドを 1 外へ寄せると、内側 3.05・外側 4.47 で無警告。"""
     found = ear_fits(SPEC)
     assert not _fatal(found) and any("内側" in i.what for i in found) and any("外側" in i.what for i in found)
     wide = float(SPEC.hoop.gap) + 4
     assert ear_fits(override(SPEC, lug__standoff=11, hoop__gap=wide)) == []
     assert any("内側" in i.what for i in ear_fits(override(SPEC, lug__standoff=10.9, hoop__gap=wide)))      # 2.95
-    assert ear_fits(override(SPEC, lug__standoff=12.4, hoop__gap=wide)) == []                               # 外側 3.07
-    assert any("外側" in i.what for i in ear_fits(override(SPEC, lug__standoff=12.5, hoop__gap=wide)))      # 外側 2.97
+    assert ear_fits(override(SPEC, lug__standoff=12.5, hoop__gap=wide)) == []                               # 外側 3.06
+    assert any("外側" in i.what for i in ear_fits(override(SPEC, lug__standoff=12.6, hoop__gap=wide)))      # 外側 2.96
 
 
 def test_too_many_ears_and_lugs_run_into_each_other():
@@ -170,14 +173,34 @@ def test_too_many_ears_and_lugs_run_into_each_other():
     assert spacing(SPEC) == [] and spacing(override(SPEC, lug__count=2, hoop__ear__count=2)) == []
 
 
-def test_an_ear_that_sticks_up_out_of_the_rim_is_fatal():
-    """受金の下面 = 膜面、上面 = 膜面 + 板厚。リムの高さ 12 を超えるとフープの上端から突き出る。"""
-    assert any("受金" in w and "突き出" in w for w in _fatal(ear_fits(override(SPEC, hoop__ear__thickness=12.1))))
-    assert not any("突き出" in w for w in _fatal(ear_fits(override(SPEC, hoop__ear__thickness=12))))
-    assert any("突き出" in w for w in _fatal(ear_fits(override(SPEC, hoop__inner__height=5.9))))
+def test_an_ear_cannot_stick_up_out_of_the_rim_because_its_top_is_the_hoop_top_minus_the_head():
+    """受金の上面 = フープの上端 − ロッドの頭の高さ。頭の高さが正（構造の検査が保証する）なら、突き出ない。負なら fatal。"""
+    assert not any("突き出" in w for w in _fatal(ear_fits(SPEC)))
+    assert not any("突き出" in w for w in _fatal(ear_fits(override(SPEC, hoop__ear__thickness=40))))      # 板厚は下へ伸びるだけ
+    assert any("受金" in w and "突き出" in w for w in _fatal(ear_fits(override(SPEC, lug__rod_head_height=-1))))
+
+
+def test_an_ear_must_overlap_the_inner_ring_in_z_to_be_welded_to_it():
+    """受金の帯 [上面 − 板厚, 上面 = フープの上端 − 頭の高さ 5] と内リングの帯 [膜面, フープの上端] の重なり。
+    既定は上面 = 膜面 + 3 で 3 mm（板厚の半分ちょうど。縁は通す）。リム inner.height = 5 で重なり 0 になり、溶接できない。"""
+    weld = lambda spec: [i for i in ear_fits(spec) if "内リング" in i.what]
+    assert weld(SPEC) == []
+    assert any("溶接できない" in w for w in _fatal(ear_fits(override(SPEC, hoop__inner__height=5)))), "重なり 0"
+    assert any("溶接できない" in w for w in _fatal(ear_fits(override(SPEC, hoop__inner__height=4))))      # 受金が膜面より下に収まる
+    for height in (5.1, 7.9):                                                                           # 正だが板厚の半分（3）に足りない
+        found = weld(override(SPEC, hoop__inner__height=height))
+        assert len(found) == 1 and not found[0].fatal and "溶接" in found[0].what, height
+    assert weld(override(SPEC, hoop__inner__height=8)) == [] and weld(override(SPEC, hoop__inner__height=20)) == []
+
+
+def test_the_weld_overlap_is_the_whole_thickness_when_the_ear_sits_inside_the_rim_band():
+    """受金が内リングの帯に完全に入る（下面が膜面より上）と、重なりは板厚。板厚の半分には足りる。"""
+    thin = override(SPEC, hoop__inner__height=20, hoop__ear__thickness=2)
+    assert [i for i in ear_fits(thin) if "内リング" in i.what] == []
+    assert any("溶接できない" in w for w in _fatal(ear_fits(override(SPEC, hoop__inner__height=5, hoop__ear__thickness=2))))
 
 
 def test_an_ear_that_does_not_reach_the_pipe_is_fatal():
-    """管の下端 = フープの上端 − 外径。受金の上面（膜面 + 6）が管の下端以下だと、受金が管に届かず溶接できない。"""
-    assert any("受金" in w and "届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=6))))
-    assert not any("届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=6.1))))
+    """管の下端 = フープの上端 − 外径。受金の上面（フープの上端 − 5）が管の下端以下だと、受金が管に届かず溶接できない。"""
+    assert any("受金" in w and "届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=5))))
+    assert not any("届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=5.1))))

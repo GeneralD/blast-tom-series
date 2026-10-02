@@ -77,6 +77,20 @@ def _arms(spec: GatlingSpec) -> list[list[Point]]:
     return [rect(radii(spec).band_outer, cradle_corner(spec), -w / 2, w / 2, a) for a in ARM_ANGLES]
 
 
+def ear_clear(spec: GatlingSpec) -> list[Issue]:
+    """受金が、フレッシュフープ（ヘッドのカラー。半径 `collar`、z は下端から膜面）に食い込まない。
+
+    受金の内端は内リングの外面（円柱で切る）なので、平面視ではその半径より内側に入らない。受金の下面は膜面より下に出る
+    ので、z はフレッシュフープの帯と重なる。内リングの外面がフレッシュフープの外面より内側（内リングを薄く、掛かりを
+    大きくしたとき）だと、受金がカラーを食う。
+    """
+    z, r = levels(spec), radii(spec)
+    name, radius, z0, z1 = next(part for part in _round_parts(spec) if part[0] == "フレッシュフープ")
+    if z_overlap(z.ear_bottom, z.ear_top, z0, z1) and r.hoop_in_outer < radius - EPS:
+        return [Issue(True, f"受金が{name}に食い込む（平面視で受金の内端 {r.hoop_in_outer:.2f} < 外半径 {radius:.2f}、z も重なる）")]
+    return []
+
+
 def mount_clear(spec: GatlingSpec) -> list[Issue]:
     """ホルダー受け・当て板・グリップ・胴バンドの耳が、胴まわりの部品・ラグ・ロッド・クレードルに食い込まない。
     ラグは胴バンドの耳（`_band_tabs`。ボルトの頭を含む）にも当たらない。

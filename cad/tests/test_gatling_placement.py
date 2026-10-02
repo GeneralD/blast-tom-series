@@ -66,25 +66,33 @@ def test_the_film_rests_on_the_bearing_edge_and_the_collar_hangs_outside_the_she
 def test_the_rim_is_shallow_and_the_pipe_ring_hangs_from_the_same_top():
     """リムの高さ（膜面から内リングの上端まで）= inner.height。外リングの管は上端を内リングの上端に揃え、下へ垂れる。"""
     z = levels(SPEC)
-    assert z.hoop_top == pytest.approx(z.head_top + 12)                       # リムの高さ 12
+    assert z.hoop_top == pytest.approx(z.head_top + 8)                        # リムの高さ 8
     assert z.pipe_centre == pytest.approx(z.hoop_top - 25.4 / 2)               # 管の上端 = 内リングの上端
     assert z.hoop_bottom == pytest.approx(z.hoop_top - 25.4)                   # 下端は管の下端（103.79）
     assert z.hoop_bottom < z.head_top
-    thin = levels(override(SPEC, hoop__outer__od=10))
+    thin = levels(override(SPEC, hoop__outer__od=6))
     assert thin.hoop_bottom == pytest.approx(thin.head_top)                    # 管がリムより細ければ、内リングの下面が下端
 
 
-def test_the_ears_sink_between_the_rings_from_the_head_top():
+def test_the_ear_top_is_the_hoop_top_minus_the_rod_head_height_and_the_ear_hangs_a_thickness_below():
+    """ロッドの頭の上面をリムの上端に揃える。受金の z はこの式 1 か所で決まり、下面は膜面より下（フレッシュフープの外側）に出る。"""
     z = levels(SPEC)
-    assert z.ear_bottom == pytest.approx(z.head_top)                           # 受金の下面 = 内リングの下端
-    assert z.ear_top == pytest.approx(z.head_top + 6) and z.ear_top < z.hoop_top   # フープの上端から突き出ない
+    assert z.ear_top == pytest.approx(z.hoop_top - 5) and z.ear_top == pytest.approx(z.head_top + 3)
+    assert z.ear_bottom == pytest.approx(z.ear_top - 6) and z.ear_bottom < z.head_top
+    for path, value in (("hoop.inner.height", 10), ("lug.rod_head_height", 2), ("hoop.ear.thickness", 9), ("head.film_mil", 10)):
+        spec = override(SPEC, **{path.replace(".", "__"): value})
+        moved = levels(spec)
+        assert moved.ear_top == pytest.approx(moved.hoop_top - float(spec.lug.rod_head_height)), path
+        assert moved.ear_bottom == pytest.approx(moved.ear_top - float(spec.hoop.ear.thickness)), path
 
 
 def test_the_rod_head_rests_on_the_ear_and_the_shaft_runs_down_by_the_rod_length():
     z = levels(SPEC)
     assert z.rod_top == pytest.approx(z.ear_top + 5)                           # 頭の高さ 5
     assert z.rod_tip == pytest.approx(z.ear_top - 50)                          # 軸の長さ 50
-    assert z.lug_bottom < z.rod_tip < z.lug_top and z.rod_top < z.hoop_top
+    assert z.lug_bottom < z.rod_tip < z.lug_top
+    assert z.rod_top == pytest.approx(z.hoop_top)                              # 頭の上面 = リムの上端（頭の高さを変えても揃う）
+    assert levels(override(SPEC, lug__rod_head_height=3)).rod_top == pytest.approx(z.hoop_top)
 
 
 def test_the_plenum_height_runs_from_the_edge_ring_underside_to_the_flange_top():
@@ -101,7 +109,7 @@ def test_the_clamps_follow_the_tube_length_and_the_ratios():
 
 def test_the_lugs_stand_a_takeup_below_the_collar_and_inside_the_shell_height():
     z = levels(SPEC)
-    assert (z.lug_top, z.lug_bottom) == pytest.approx((98.7905, 63.7905))       # 管の下端 − 締め代 5
+    assert (z.lug_top, z.lug_bottom) == pytest.approx((94.7905, 59.7905))       # 管の下端 − 締め代 5
     assert min(z.collar_bottom, z.hoop_bottom) - z.lug_top == pytest.approx(5)   # 引き下ろす余地。ラグが止まりにならない
     assert z.flange_top < z.lug_bottom and z.lug_top < z.shell_top
     low = levels(override(SPEC, hoop__outer__od=38.1))                            # 管が太くなれば、ラグはその下
@@ -112,7 +120,7 @@ def test_the_lugs_stand_a_takeup_below_the_collar_and_inside_the_shell_height():
 
 def test_the_rod_path_from_the_ear_top_to_the_lug_bottom_adds_up_ear_pipe_takeup_and_lug():
     z = levels(SPEC)
-    assert z.ear_top - z.lug_bottom == pytest.approx(6 + (25.4 - 12) + 5 + 35)   # 59.4（受金 + 管がリムより下に垂れる分 + 締め代 + ラグ）
+    assert z.ear_top - z.lug_bottom == pytest.approx(25.4 - 5 + 5 + 35)   # 60.4（管の外径 − 頭の高さ（受金の上面は管の上端より頭の高さだけ下）+ 締め代 + ラグ）
 
 
 def test_the_band_sits_above_the_flange_and_the_frame_at_mid_plenum_height():
@@ -147,7 +155,7 @@ def test_the_pipe_inner_surface_is_narrowest_at_the_pipe_centre_height():
     """管の内側（胴の軸の側）の面の半径。z の帯の中で最も軸に近い所を返し、帯が管に掛からなければ無限大。"""
     z = levels(SPEC)
     assert pipe_inner_radius(SPEC, z.lug_bottom, z.ear_top) == pytest.approx(90.7)          # 管の中心の高さを含む
-    head = 103.4 - math.sqrt(12.7**2 - (z.ear_top - z.pipe_centre) ** 2)                      # 受金の上面（中心から 6.7 上）
-    assert pipe_inner_radius(SPEC, z.ear_top, z.rod_top) == pytest.approx(head)              # 92.61
+    head = 103.4 - math.sqrt(12.7**2 - (z.ear_top - z.pipe_centre) ** 2)                      # 受金の上面（中心から 7.7 上）
+    assert pipe_inner_radius(SPEC, z.ear_top, z.rod_top) == pytest.approx(head)              # 93.30
     assert pipe_inner_radius(SPEC, z.hoop_top, z.hoop_top + 10) == math.inf
     assert pipe_inner_radius(SPEC, z.lug_bottom, z.lug_top) == math.inf

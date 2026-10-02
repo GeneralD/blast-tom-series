@@ -65,8 +65,8 @@ class Levels:
     """
 
     hoop_top: float           # 内リングの上端 = 外リングの管の上端（揃える）。膜面からの高さがリムの高さ（inner.height）
-    ear_top: float            # 受金の上面（フープの上端より下。内外リングの間に沈む）
-    ear_bottom: float         # 受金の下面（= 膜面 = 内リングの下端）
+    ear_top: float            # 受金の上面（= フープの上端 − ロッドの頭の高さ。ロッドの頭の上面がリムの上端に揃う）
+    ear_bottom: float         # 受金の下面（受金の上面 − 板厚。膜面より下、フレッシュフープの外側に出てよい）
     head_top: float           # 膜の上面（= フレッシュフープの上端、内リングの下面）
     edge_top: float           # ベアリングエッジの頂部（= 膜の下面。§5.4 の「ヘッド面」）
     collar_bottom: float      # フレッシュフープの下端（胴とエッジ環の外側に垂れる）
@@ -107,7 +107,9 @@ def levels(spec: GatlingSpec) -> Levels:
     hoop_top = head_top + float(spec.hoop.inner.height)
     pipe = float(spec.hoop.outer.od)
     hoop_bottom = min(head_top, hoop_top - pipe)
-    ear_top = head_top + float(spec.hoop.ear.thickness)
+    # 受金の z はここ 1 か所で決める: ロッドの頭の上面（受金の上面 + 頭の高さ）をリムの上端に揃え、受金はそこから下へ板厚ぶん
+    ear_top = hoop_top - float(spec.lug.rod_head_height)
+    ear_bottom = ear_top - float(spec.hoop.ear.thickness)
     lug_top = min(collar_bottom, hoop_bottom) - float(spec.hoop.takeup)
     mid_top = -float(c.mid_position) * length
     tip_bottom = -length + float(t.protrusion_ratio) * float(t.od)
@@ -116,7 +118,7 @@ def levels(spec: GatlingSpec) -> Levels:
     frame_top = frame_centre + float(spec.cradle.bar.thickness) / 2
     pad_top = frame_top + float(spec.cradle.pad.thickness)
     return Levels(
-        hoop_top=hoop_top, ear_top=ear_top, ear_bottom=head_top, head_top=head_top, edge_top=edge_top, collar_bottom=collar_bottom, shell_top=shell_top, flange_top=flange_top,
+        hoop_top=hoop_top, ear_top=ear_top, ear_bottom=ear_bottom, head_top=head_top, edge_top=edge_top, collar_bottom=collar_bottom, shell_top=shell_top, flange_top=flange_top,
         gasket_top=gasket_top, header_bottom=-float(spec.header.thickness),
         mid_top=mid_top, mid_bottom=mid_top - float(c.mid_thickness),
         tip_top=tip_bottom + float(c.tip_thickness), tip_bottom=tip_bottom, tube_tip=-length,

@@ -18,7 +18,7 @@ from drumcad.stock import nearest
 from .bounds import at_least, at_most
 from .derived import derive
 from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_rod, lookup_screw
-from .interference import flange_bolts_removable, hoop_rings, mount_clear
+from .interference import ear_clear, flange_bolts_removable, hoop_rings, mount_clear
 from .params import GatlingSpec
 from .placement import flange_bolt_points, levels, pipe_inner_radius, radii, tip_bolt_points, tube_points
 from .planar import EPS, z_overlap
@@ -236,12 +236,15 @@ def spacing(spec: GatlingSpec) -> list[Issue]:
 
 
 def ear_fits(spec: GatlingSpec) -> list[Issue]:
-    """受金がフープの上端から突き出ず（内リングの高さの帯に収まる）、外リングの管に届く（fatal）。
+    """受金がフープの上端から突き出ず、内リングと外リングの管の両方に溶接できる（fatal）。
     受金の幅がロッド通し穴より広い（fatal）。穴の両側に板厚ぶんの肉が無ければ警告。
     ロッド通し穴の径方向の肉（内側と外側）が正（fatal）。板厚の半分ぶん無ければ警告。
 
-    受金の下面は膜面（内リングの下端）なので、板厚がリムの高さを超えるとフープの上端から突き出て叩く邪魔になる。
-    受金の外端は管の中心半径で、管の形で切り欠く。受金の上面が管の下端以下だと管に接せず、溶接できない。
+    受金の上面は「フープの上端 − ロッドの頭の高さ」（頭の上面がリムの上端に揃う。`placement.levels`）で、板厚はそこから下へ
+    伸びる。下面は膜面より下（フレッシュフープの外側）に出てよい。突き出し（上面 > フープの上端）は頭の高さが負のときだけ起きる。
+    内リングとの溶接は、受金の z の帯と内リングの z の帯 [膜面, フープの上端] の重なり。0 以下なら溶接できず（fatal）、
+    板厚の半分に足りなければ警告。受金の外端は管の中心半径で、管の形で切り欠く。受金の上面が管の下端以下だと管に接せず、
+    溶接できない（fatal）。
 
     幅が穴径以下だと受金が 2 片に割れるので fatal。肉の下限（穴径 + 2 × 板厚）は、打ち抜きや穴あけで縁が
     割れたり曲がったりしない一般的な目安で、受金を新しい寸法で増やさずに済むよう板厚を流用する。目安なので
@@ -249,7 +252,12 @@ def ear_fits(spec: GatlingSpec) -> list[Issue]:
     板の縁で、既定の幅 20 では足りない（6.5 + 16 = 22.5）ので使わない。
     """
     e, z = spec.hoop.ear, levels(spec)
-    found = at_most("受金がフープの上端から突き出る（受金の上面 > フープの上端。板厚がリムの高さを超える）", z.ear_top, z.hoop_top)
+    found = at_most("受金がフープの上端から突き出る（受金の上面 > フープの上端）", z.ear_top, z.hoop_top)
+    weld = min(z.ear_top, z.hoop_top) - max(z.ear_bottom, z.head_top)
+    if weld <= EPS:
+        found.append(Issue(True, f"受金が内リングに溶接できない（受金と内リングの z の重なり {weld:.2f} ≤ 0。リムが浅いか、受金が下すぎる）"))
+    else:
+        found += at_least("受金と内リングの溶接の重なり（z）が板厚の半分に足りない", weld, float(e.thickness) / 2, fatal=False)
     pipe_bottom = z.hoop_top - float(spec.hoop.outer.od)
     if z.ear_top <= pipe_bottom + EPS:
         found.append(Issue(True, f"受金が外リング（管）に届かない（受金の上面 {z.ear_top:.2f} ≤ 管の下端 {pipe_bottom:.2f}）"))
@@ -350,5 +358,5 @@ def issues(spec: GatlingSpec) -> list[Issue]:
     found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec) + tip_bolts_clear(spec)
     found += aligned(int(float(spec.tube.count)), int(float(spec.lug.count)), int(float(spec.hoop.ear.count)))
     found += rod_fits(spec) + hoop_seat(spec) + ear_fits(spec) + spacing(spec) + lug_fits(spec) + cradle_fits(spec) + holder_fits(spec) + bolt_lengths(spec)
-    found += mount_clear(spec)
+    found += ear_clear(spec) + mount_clear(spec)
     return found + stock_warning(spec)

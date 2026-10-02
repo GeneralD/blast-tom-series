@@ -23,7 +23,7 @@ _LOW = {"shell.plenum_height": 10}      # フレーム（z 9〜15）が外リン
 
 
 def test_a_frame_below_the_hoop_does_not_need_to_clear_it():
-    """既定ではフレームの内面 98 < 管の外面 116.1 だが、フレーム（z 54〜60）は管（z 103.79〜129.19）より下にある。"""
+    """既定ではフレームの内面 98 < 管の外面 116.1 だが、フレーム（z 54〜60）は管（z 99.79〜125.19）より下にある。"""
     assert cradle_fits(SPEC) == []
 
 

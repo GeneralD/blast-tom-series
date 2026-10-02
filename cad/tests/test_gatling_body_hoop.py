@@ -35,7 +35,7 @@ def test_the_shell_is_a_thin_ring_between_the_flange_top_and_the_edge_ring():
 
 def test_the_shell_has_two_mounting_holes_per_lug_at_the_lug_pitch():
     s = shell(SPEC)
-    zc = (63.7905 + 98.7905) / 2                                   # ラグの高さの中央
+    zc = (59.7905 + 94.7905) / 2                                   # ラグの高さの中央
     for angle in (0, 60, 120, 180, 240, 300):
         c, sn = math.cos(math.radians(angle)), math.sin(math.radians(angle))
         for dz in (-12.5, 12.5):                                    # pitch 25
@@ -63,21 +63,21 @@ def test_the_edge_ring_sits_on_the_shell_top_with_the_same_outside():
 def test_the_inner_ring_is_a_shallow_flat_bar_ring_on_the_collar():
     inner = hoop_inner(SPEC)
     box = _box(inner)
-    assert inner.solids().size() == 1 and (box.zmin, box.zmax) == pytest.approx((117.1905, 129.1905))   # リムの高さ 12
+    assert inner.solids().size() == 1 and (box.zmin, box.zmax) == pytest.approx((117.1905, 125.1905))   # リムの高さ 8
     assert box.xlen == pytest.approx(2 * 80.7, abs=1e-3)
-    assert _volume(inner) == pytest.approx(math.pi * (80.7**2 - 76.7**2) * 12, rel=1e-6)
+    assert _volume(inner) == pytest.approx(math.pi * (80.7**2 - 76.7**2) * 8, rel=1e-6)
 
 
 def test_the_outer_ring_is_a_hollow_pipe_bent_into_a_ring_level_with_the_rim():
-    """φ25.4 × t1.5 の管の環。中心半径 103.4、上端を内リングの上端 129.19 に揃える。"""
+    """φ25.4 × t1.5 の管の環。中心半径 103.4、上端を内リングの上端 125.19 に揃える。"""
     outer = hoop_outer(SPEC)
     box = _box(outer)
-    assert outer.solids().size() == 1 and (box.zmin, box.zmax) == pytest.approx((103.7905, 129.1905), abs=1e-3)
+    assert outer.solids().size() == 1 and (box.zmin, box.zmax) == pytest.approx((99.7905, 125.1905), abs=1e-3)
     assert box.xlen == pytest.approx(2 * 116.1, abs=1e-3)
     solid = 2 * math.pi * 103.4 * math.pi * 12.7**2
     assert _volume(outer) < solid / 2                                                    # 中空
     assert _volume(outer) == pytest.approx(2 * math.pi * 103.4 * math.pi * (12.7**2 - 11.2**2), rel=1e-4)
-    zc = 129.1905 - 12.7
+    zc = 125.1905 - 12.7
     assert not _inside(outer, 103.4, 0, zc)                                              # 管の中は空き
     assert _inside(outer, 103.4 + 11.95, 0, zc) and _inside(outer, 103.4 - 11.95, 0, zc)  # 肉厚 1.5 の壁
     assert not _inside(outer, 86, 0, 120) and not _inside(hoop_inner(SPEC), 86, 0, 120)   # ロッドの通り道は空き
@@ -92,9 +92,10 @@ def test_the_inner_ring_stands_on_the_top_of_the_collar_inside_the_head_outer_di
 def test_six_ears_sink_between_the_rings_below_the_hoop_top_with_a_hole_for_the_rod():
     e = ear(SPEC)
     box = _box(e)
-    assert e.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((117.1905, 123.1905))   # 下面 = 膜面、上面 < フープの上端 129.19
+    assert e.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((114.1905, 120.1905))   # 上面 = フープの上端 125.19 − 頭の高さ 5、下面は板厚 6 下（膜面 117.19 より下）
     assert _inside(e, 82, 0, 120) and not _inside(e, 86, 0, 120)                                      # 内リングの外面 80.7 から、穴はロッドの半径
-    assert _inside(e, 92, 0, 122.5) and not _inside(e, 100, 0, 122)                                  # 管に沿って切り欠く（管の中には無い）
+    assert _inside(e, 92, 0, 119.5) and not _inside(e, 100, 0, 119.5)                                # 管に沿って切り欠く（管の中には無い）
+    assert _inside(e, 82, 0, 115) and not _inside(e, 82, 0, 113.5) and not _inside(e, 82, 0, 121)    # 膜面 117.19 より下まで伸びる
     assert not _inside(e, 86 * math.cos(math.pi / 3), 86 * math.sin(math.pi / 3), 120)               # 60° のロッド穴も空き
 
 

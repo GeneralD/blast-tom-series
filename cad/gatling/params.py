@@ -191,7 +191,7 @@ class GatlingSpec:
 
 
 _REAL = "置き値（実物を測るまで）"
-_RIM = "剛性を保ちつつリムを浅く。試作で詰める（D-20）"
+_RIM = "リムを浅く。ユーザーの見立て。試作で詰める（D-20）"
 _HOOP_PIPE = "手すり用 #400 研磨管 φ25.4 × t1.5（D-20）"
 
 SPEC = GatlingSpec(
@@ -208,7 +208,7 @@ SPEC = GatlingSpec(
     shell=Shell(thickness=design(1.2), plenum_height=design(100)),
     edge=Edge(angle=design(45), radius=design(1.5), height=design(10), width=design(4, "胴より厚く取って 45° の面を切る")),
     hoop=Hoop(
-        inner=HoopRing(thickness=provisional(4, _RIM), height=provisional(12, _RIM)),
+        inner=HoopRing(thickness=provisional(4, _RIM), height=provisional(8, _RIM)),
         outer=HoopPipe(od=design(25.4, _HOOP_PIPE), thickness=design(1.5, _HOOP_PIPE)),
         gap=design(10, "ロッドとその頭が通る間隔（D-20）"),
         seat=design(1.0, "フレッシュフープの上面に掛かる幅（環の肉厚 head.collar_wall の内側に収める。hoop_seat が見る）"),

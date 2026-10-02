@@ -30,7 +30,7 @@ def test_the_default_spec_has_no_fatal_issue_and_only_the_two_known_radial_wall_
     ("ロッドがリングの間に入らない", {"hoop.gap": 4}, "外リング"),
     ("ロッドが短い", {"lug.rod_length": 20}, "ロッドが短い"),
     ("クレードルがフープに干渉", {"shell.plenum_height": 10}, "クレードルがフープ"),
-    ("受金がフープから突き出る", {"hoop.ear.thickness": 13}, "突き出"),
+    ("受金が内リングに溶接できない", {"hoop.inner.height": 5}, "溶接できない"),
     ("個数が整数でない", {"tube.count": 6.5}, "整数"),
 ])
 def test_each_failure_the_spec_names_is_caught(label, values, fragment):
