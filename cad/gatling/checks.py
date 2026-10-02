@@ -238,6 +238,7 @@ def spacing(spec: GatlingSpec) -> list[Issue]:
 def ear_fits(spec: GatlingSpec) -> list[Issue]:
     """受金がフープの上端から突き出ず（内リングの高さの帯に収まる）、外リングの管に届く（fatal）。
     受金の幅がロッド通し穴より広い（fatal）。穴の両側に板厚ぶんの肉が無ければ警告。
+    ロッド通し穴の径方向の肉（内側と外側）が正（fatal）。板厚の半分ぶん無ければ警告。
 
     受金の下面は膜面（内リングの下端）なので、板厚がリムの高さを超えるとフープの上端から突き出て叩く邪魔になる。
     受金の外端は管の中心半径で、管の形で切り欠く。受金の上面が管の下端以下だと管に接せず、溶接できない。
@@ -253,6 +254,14 @@ def ear_fits(spec: GatlingSpec) -> list[Issue]:
     if z.ear_top <= pipe_bottom + EPS:
         found.append(Issue(True, f"受金が外リング（管）に届かない（受金の上面 {z.ear_top:.2f} ≤ 管の下端 {pipe_bottom:.2f}）"))
     hole = float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)
+    r = radii(spec)
+    inner_wall = (r.rod - hole / 2) - r.hoop_in_outer
+    outer_wall = min(pipe_inner_radius(spec, z.ear_bottom, z.ear_top), r.hoop_out_centre) - (r.rod + hole / 2)
+    guide = float(e.thickness) / 2
+    for side, wall in (("内側", inner_wall), ("外側", outer_wall)):
+        found += at_least(f"受金のロッド通し穴が受金の{side}の端を破る（{side}の肉）", wall, EPS)
+        if wall > EPS:
+            found += at_least(f"受金のロッド通し穴の{side}の肉（径方向）が板厚の半分に足りない", wall, guide, fatal=False)
     width = float(e.width)
     if width <= hole + EPS:
         return found + [Issue(True, f"受金の幅がロッド通し穴の径以下で、受金が 2 片に割れる（{width:.2f} ≤ {hole:.2f}）")]

@@ -13,7 +13,7 @@ def _fatal(issues):
 
 
 def test_the_default_hoop_lugs_and_rods_pass():
-    assert aligned(6, 6, 6) == [] and rod_fits(SPEC) == [] and lug_fits(SPEC) == [] and hoop_seat(SPEC) == [] and ear_fits(SPEC) == []
+    assert aligned(6, 6, 6) == [] and rod_fits(SPEC) == [] and lug_fits(SPEC) == [] and hoop_seat(SPEC) == [] and not _fatal(ear_fits(SPEC))
 
 
 @pytest.mark.parametrize("tubes, lugs", [(6, 6), (6, 3), (6, 2), (6, 1), (3, 6), (12, 6), (12, 4)])
@@ -134,7 +134,29 @@ def test_a_thin_wall_beside_the_rod_hole_is_only_a_warning():
     for values in ({"hoop.ear.width": 6.6}, {"hoop.ear.width": 18.4}, {"hoop.ear.thickness": 8}):
         found = ear_fits(override(SPEC, **values))
         assert found and not _fatal(found) and all("受金" in i.what for i in found), values
-    assert ear_fits(override(SPEC, hoop__ear__width=18.5)) == []
+    assert not any("幅" in i.what for i in ear_fits(override(SPEC, hoop__ear__width=18.5)))     # 径方向の肉の警告は別（下のテスト）
+
+
+def test_the_ear_walls_beside_the_rod_hole_are_fatal_when_the_hole_breaks_out_of_the_plate():
+    """肉 = 内側は (ロッド − 穴径 / 2) − 内リングの外面（80.7）、外側は受金の z 帯での管の内面（90.72）− (ロッド + 穴径 / 2)。
+    穴の半径 3.25。ロッドの半径 = 76 + standoff。内側は 84 で 0.05、83.9 で負。外側は 87.4 で 0.07、87.5 で負。"""
+    assert any("内側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=7.9))))
+    assert not any("内側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=8.0))))
+    assert any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.5))))
+    assert not any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.4))))
+    assert any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.7))))        # 穴が受金の外端（管の切り欠き）を破る
+
+
+def test_a_thin_radial_wall_beside_the_rod_hole_is_only_a_warning():
+    """径方向の肉は、穴の両側が溶接でリングに支えられるので、板厚（6）の半分の 3 mm を目安にする。既定は内側 2.05・外側 1.47 で警告。
+    リングの間（gap）を 4 広げ、ロッドを 1 外へ寄せると、内側 3.05・外側 4.47 で無警告。"""
+    found = ear_fits(SPEC)
+    assert not _fatal(found) and any("内側" in i.what for i in found) and any("外側" in i.what for i in found)
+    wide = float(SPEC.hoop.gap) + 4
+    assert ear_fits(override(SPEC, lug__standoff=11, hoop__gap=wide)) == []
+    assert any("内側" in i.what for i in ear_fits(override(SPEC, lug__standoff=10.9, hoop__gap=wide)))      # 2.95
+    assert ear_fits(override(SPEC, lug__standoff=12.4, hoop__gap=wide)) == []                               # 外側 3.07
+    assert any("外側" in i.what for i in ear_fits(override(SPEC, lug__standoff=12.5, hoop__gap=wide)))      # 外側 2.97
 
 
 def test_too_many_ears_and_lugs_run_into_each_other():
