@@ -18,15 +18,15 @@ def test_the_default_spec_has_nothing_in_the_way():
 
 @pytest.mark.parametrize("count", [4, 8, 12])
 def test_a_lug_under_the_holder_is_fatal(count):
-    """ラグ数 4・8・12 では −Y（270°）にラグが来て、ホルダー受け（中心 y −110.5、半径 20）にラグの箱（u 76〜96）が 5.5 食い込む。"""
+    """ラグ数 4・8・12 では −Y（270°）にラグが来て、ホルダー受け（中心 y −110.5、半径 20）にラグの本体（u 78〜94）が 3.5 食い込む。"""
     found = _fatal(override(SPEC, lug__count=count, hoop__ear__count=count))
     assert any("ラグ" in w and "ホルダー受け" in w for w in found), found
 
 
 def test_a_lug_that_just_clears_the_holder_passes():
-    # 逃げ 20.5: ホルダー中心 y −116、内縁 −96 = ラグの外端 −96（接するだけ）
-    assert not any("ホルダー受け" in w for w in _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=20.5)))
-    assert any("ホルダー受け" in w for w in _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=20.4)))
+    # 逃げ 18.5: ホルダー中心 y −114、内縁 −94 = ラグの本体の外端 −94（接するだけ）
+    assert not any("ホルダー受け" in w for w in _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=18.5)))
+    assert any("ホルダー受け" in w for w in _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=18.4)))
 
 
 def test_a_lug_that_reaches_down_to_the_pad_is_fatal():
@@ -59,11 +59,11 @@ def test_a_grip_too_close_to_the_frame_runs_into_the_pad_and_the_holder():
 
 
 def test_a_lug_that_reaches_down_to_the_frame_and_sticks_out_of_it_is_fatal():
-    """ラグ高さ 50（下端 44.79）でフレーム（z 54〜60）と z が重なる。0° のラグの外の隅 (96, ±10) がフレーム内面 83 + 逃げ の外に出ると当たる。"""
+    """ラグ高さ 50（下端 44.79）でフレーム（z 54〜60）と z が重なる。0° のラグの本体の外端（u 94）がフレーム内面 83 + 逃げ の外に出ると当たる。"""
     tall = {"lug.height": 50}
     assert any("ラグ" in w and "フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=8, **tall)))
-    assert any("ラグ" in w and "フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=12.9, **tall)))
-    assert not any("フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=13, **tall)))     # 隅がちょうど内面に接する
+    assert any("ラグ" in w and "フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=10.9, **tall)))
+    assert not any("フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=11, **tall)))     # 本体の外端がちょうど内面に接する
 
 
 def test_a_lug_on_the_diagonal_that_reaches_down_to_an_arm_is_fatal():

@@ -75,7 +75,7 @@ def parts(spec: DemoSpec) -> list[PartInfo]:
 
 def bom(spec: DemoSpec) -> list[BomRow]:
     return [
-        BomRow("ラグ", "purchased", None, "DW タレットラグ", "", int(spec.lugs), "DWSM2200", 100.0),
+        BomRow("ラグ", "purchased", None, "タレットラグ", "", int(spec.lugs), "TL-0001", 100.0),
     ]
 
 

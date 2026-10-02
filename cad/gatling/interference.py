@@ -15,7 +15,7 @@ from .bounds import at_least
 from .derived import derive
 from .fasteners import lookup_rod, lookup_screw
 from .params import GatlingSpec
-from .placement import (band_tab_length, cradle_corner, cradle_y_rear, flange_bolt_points, grip_y, levels, lug_angles, lug_box,
+from .placement import (band_tab_length, cradle_corner, cradle_y_rear, flange_bolt_points, grip_y, levels, lug_angles, lug_plan,
                         radii)
 from .planar import EPS, Point, circle_overlaps, origin_distance, polygons_overlap, rect, square_reach, z_overlap
 
@@ -97,7 +97,7 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
 
     z の範囲が重なり、かつ平面視でも重なれば干渉（fatal）。平面視の形は形状と同じ placement の値から作る:
     ホルダー受けは中心 (0, `cradle_y_rear`)・半径 body_dia/2 の円、当て板は同じ中心の軸平行な矩形、ラグは
-    `lug_box` を `lug_angles` の方位へ回した矩形、ロッドは半径 `rod` の円周上の円。胴まわりの回転体は
+    `lug_plan`（台座の矩形と本体の正方形）を `lug_angles` の方位へ回した矩形の組、ロッドは半径 `rod` の円周上の円。胴まわりの回転体は
     外半径の円で見る（中は空いていても、外から来る部品は外面で当たる）。グリップは X 方向の丸棒なので、
     YZ 面の円（中心 (`grip_y`, frame_centre)、半径 grip_dia/2）と、当て板・ホルダー受けの YZ 面の矩形で見る。
     """
@@ -112,7 +112,7 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
             found.append(Issue(True, f"ホルダー受けが{name}に食い込む（平面視で内縁 {abs(y0) - rb:.2f} < 外半径 {radius:.2f}、z も重なる）"))
         if z_overlap(z0, z1, *pad_z) and origin_distance(pad) < radius - EPS:
             found.append(Issue(True, f"当て板が{name}に食い込む（平面視で内縁 {origin_distance(pad):.2f} < 外半径 {radius:.2f}、z も重なる）"))
-    box, rod_r = lug_box(spec), float(lookup_rod(spec.lug.thread)) / 2
+    plan, rod_r = lug_plan(spec), float(lookup_rod(spec.lug.thread)) / 2
     # ロッドは軸の先から頭の上面まで（平面視は軸の径で見る。頭は内外リングの間にあり、`rod_fits` が見る）。
     # 軸の先はラグの下端より下に出うる（警告）ので、ラグの外の部品（胴バンド・フランジ・腕・耳・フレーム・当て板・ホルダー受け）とも見る
     lug_z, rod_z = (z.lug_bottom, z.lug_top), (z.rod_tip, z.rod_top)
@@ -127,16 +127,16 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
     tabs, tab_z = _band_tabs(spec)
     hits: dict[str, list[float]] = {}
     for a in lug_angles(spec):
-        lug = rect(*box, a)
+        lug = [rect(*box, a) for box in plan]
         rod = (r.rod * math.cos(math.radians(a)), r.rod * math.sin(math.radians(a)))
         for what, hit in (
-            ("ラグがホルダー受けに当たる", z_overlap(*lug_z, *holder_z) and circle_overlaps((0.0, y0), rb, lug)),
-            ("ラグが当て板に当たる", z_overlap(*lug_z, *pad_z) and polygons_overlap(lug, pad)),
+            ("ラグがホルダー受けに当たる", z_overlap(*lug_z, *holder_z) and any(circle_overlaps((0.0, y0), rb, part) for part in lug)),
+            ("ラグが当て板に当たる", z_overlap(*lug_z, *pad_z) and any(polygons_overlap(part, pad) for part in lug)),
             ("ロッドが当て板に当たる", z_overlap(*rod_z, *pad_z) and circle_overlaps(rod, rod_r, pad)),
             ("ロッドがホルダー受けに当たる", z_overlap(*rod_z, *holder_z) and math.dist(rod, (0.0, y0)) < rod_r + rb - EPS),
-            ("ラグがクレードルのフレームの内面から外に出て当たる", z_overlap(*lug_z, *frame_z) and square_reach([lug]) > r.frame_inner + EPS),
-            ("ラグがクレードルの腕に当たる", z_overlap(*lug_z, *arm_z) and any(polygons_overlap(lug, arm) for arm in arms)),
-            ("ラグが胴バンドの耳（ボルトの頭を含む）に当たる", z_overlap(*lug_z, *tab_z) and any(polygons_overlap(lug, tab) for tab in tabs)),
+            ("ラグがクレードルのフレームの内面から外に出て当たる", z_overlap(*lug_z, *frame_z) and square_reach(lug) > r.frame_inner + EPS),
+            ("ラグがクレードルの腕に当たる", z_overlap(*lug_z, *arm_z) and any(polygons_overlap(part, arm) for part in lug for arm in arms)),
+            ("ラグが胴バンドの耳（ボルトの頭を含む）に当たる", z_overlap(*lug_z, *tab_z) and any(polygons_overlap(part, tab) for part in lug for tab in tabs)),
             ("ロッドがクレードルのフレームの内面から外に出て当たる",
              z_overlap(*rod_z, *frame_z) and max(abs(rod[0]), abs(rod[1])) + rod_r > r.frame_inner + EPS),
             ("ロッドがクレードルの腕に当たる", z_overlap(*rod_z, *arm_z) and any(circle_overlaps(rod, rod_r, arm) for arm in arms)),

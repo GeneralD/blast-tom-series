@@ -73,8 +73,9 @@ class Hoop:
 @dataclass(frozen=True)
 class Lug:
     model: Choice
-    pitch: Dim               # 胴の取付穴 2 つの間隔
-    height: Dim
+    body_dia: Dim            # ラグの本体（ロッドと同軸の縦の円筒）の径。ロッドの穴が縦に通る
+    foot_dia: Dim            # 台座（胴の外面から本体まで、ねじの軸方向に伸びる短い円柱）の径。胴にねじ 1 本で留める
+    height: Dim              # 本体の高さ。台座の軸と胴の取付穴は、この高さの中心
     thread: Choice           # テンションロッドのねじ
     count: Dim
     standoff: Dim            # 胴外面からロッド中心まで
@@ -217,8 +218,9 @@ SPEC = GatlingSpec(
                 hole_clearance=design(1.0, "ロッド通し穴の逃げ")),
     ),
     lug=Lug(
-        model=Choice("DW タレットラグ", Source.PROVISIONAL, "実物 1 セットを測るまで"),
-        pitch=provisional(25, _REAL),
+        model=Choice("単穴の円筒ラグ（型番未定）", Source.PROVISIONAL, "実物 1 セットを測るまで。メーカーは固定しない（D-21）"),
+        body_dia=provisional(16, _REAL),
+        foot_dia=provisional(12, _REAL),
         height=provisional(35, _REAL),
         thread=Choice("#12-24", Source.PROVISIONAL, _REAL),
         count=design(6, "管の本数と方位を揃える"),

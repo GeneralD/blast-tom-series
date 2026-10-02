@@ -21,8 +21,9 @@ from .params import GatlingSpec
 BAND_SIDES = (1, -1)
 BAND_SPLIT = len(BAND_SIDES)      # 半環の数 = 分割面の端の数（耳の組・ボルト・ゴムシートの数）
 
-# ラグ 1 個につき胴の取付穴は上下 2 つ（ラグの高さの中心から ± `lug.pitch` / 2）。
-LUG_HOLE_SIDES = (-1, 1)
+# ラグは胴にねじ 1 本で留める（D-21）。胴の取付穴はラグ 1 個につき、ラグの高さの中心に 1 つ。
+# 値は穴の位置のラグの高さの中心からの比（ラグの高さ × 値だけ上）。形は符号でループし、員数は `LUG_HOLES` で数える。
+LUG_HOLE_SIDES = (0,)
 LUG_HOLES = len(LUG_HOLE_SIDES)
 
 
@@ -180,14 +181,18 @@ def pipe_inner_radius(spec: GatlingSpec, z0: float, z1: float) -> float:
     return r.hoop_out_centre - math.sqrt(half * half - d * d)
 
 
-def lug_box(spec: GatlingSpec) -> tuple[float, float, float, float]:
-    """ラグの箱の平面形（ラグの局所座標）。u は胴の中心からラグの方位へ、v はそれに直交（反時計回りが正）。
+def lug_plan(spec: GatlingSpec) -> list[tuple[float, float, float, float]]:
+    """ラグの平面形（ラグの局所座標）を、凸の矩形の組で返す（干渉の検査用。形と同じ葉から作る）。
 
-    (u0, u1, v0, v1) = (胴外面, 胴外面 + 2 × standoff, −standoff, standoff)。ロッドは箱の中心（u = `rod`）を通る。
+    u は胴の中心からラグの方位へ、v はそれに直交（反時計回りが正）。(u0, u1, v0, v1) の組:
+    1. 台座: 胴の外面からロッドの中心まで、幅は台座の径。
+    2. 本体: ロッドの中心の周りの、本体の径の正方形（円に外接。保守側）。胴の外面にかかるぶんは胴の外面で切る（形も同じ）。
     方位 a のラグの平面座標は x = u cos a − v sin a、y = u sin a + v cos a（`lug_angles` の向き）。
     """
-    shell, stand = float(derive(spec).shell_od) / 2, float(spec.lug.standoff)
-    return shell, shell + 2 * stand, -stand, stand
+    s = spec.lug
+    shell, rod = float(derive(spec).shell_od) / 2, float(derive(spec).shell_od) / 2 + float(s.standoff)
+    foot, body = float(s.foot_dia) / 2, float(s.body_dia) / 2
+    return [(shell, rod, -foot, foot), (max(shell, rod - body), rod + body, -body, body)]
 
 
 def band_tab_length(spec: GatlingSpec) -> float:

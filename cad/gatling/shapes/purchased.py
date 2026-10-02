@@ -9,7 +9,7 @@ import cadquery as cq
 
 from ..fasteners import lookup_holder, lookup_rod, lookup_screw
 from ..params import GatlingSpec
-from ..placement import (BAND_SIDES, band_bolt_x, cradle_y_rear, flange_bolt_points, levels, lug_angles, lug_box, radii,
+from ..placement import (BAND_SIDES, band_bolt_x, cradle_y_rear, flange_bolt_points, levels, lug_angles, radii,
                          tip_bolt_points)
 from .common import around_z, compound, cylinder, cylinders, disc, ring
 
@@ -26,13 +26,17 @@ def head(spec: GatlingSpec) -> cq.Workplane:
 
 
 def lug(spec: GatlingSpec) -> cq.Workplane:
-    """ラグ。胴の外に立つ箱で、ロッドを通す穴（ロッドと同径）が縦に通る。"""
+    """ラグ。ロッドと同軸の縦の円筒の本体（ロッドの穴が縦に通る）と、胴の外面から本体までの台座（胴にねじ 1 本で留める）を
+    1 つの solid にする。台座はラグの高さの中心を軸に胴の外面へ向かって伸び、胴の外面の円柱で切って、食い込まず離れず沿わせる。"""
     z, r, s = levels(spec), radii(spec), spec.lug
-    u0, u1, v0, v1 = lug_box(spec)
-    body = (cq.Workplane("XY").box(u1 - u0, v1 - v0, z.lug_top - z.lug_bottom)
-            .translate(((u0 + u1) / 2, (v0 + v1) / 2, (z.lug_top + z.lug_bottom) / 2)))
-    body = body.cut(cylinders([(r.rod, 0)], float(lookup_rod(s.thread)), z.lug_bottom, z.lug_top))
-    return around_z(body, lug_angles(spec))
+    zc = (z.lug_top + z.lug_bottom) / 2
+    body = cylinders([(r.rod, 0)], float(s.body_dia), z.lug_bottom, z.lug_top)
+    start = r.shell - float(s.foot_dia)                 # 胴の壁の中から始めて、下で胴の外面の円柱で切る（円弧に沿わせる）
+    foot = cylinder((start, 0, zc), (1, 0, 0), float(s.foot_dia), r.rod - start)
+    solid = body.union(foot).cut(cylinders([(r.rod, 0)], float(lookup_rod(s.thread)), z.lug_bottom, z.lug_top))
+    # 胴の外面より内側（台座の根元、胴にかかる本体）は胴の壁なので、胴の外面の円柱で切る
+    solid = solid.cut(cylinders([(0, 0)], 2 * r.shell, z.lug_bottom, z.lug_top))
+    return around_z(solid, lug_angles(spec))
 
 
 def rod(spec: GatlingSpec) -> cq.Workplane:

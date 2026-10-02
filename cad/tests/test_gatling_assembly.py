@@ -69,7 +69,7 @@ def test_fabricated_standards_and_dimensions_are_written_from_the_spec():
 
 def test_the_standards_of_the_purchased_parts_follow_the_choices():
     info = {p.name: p for p in parts(SPEC)}
-    assert info["lug"].standard == "DW タレットラグ" and info["rod"].standard == "テンションロッド #12-24"
+    assert info["lug"].standard == "単穴の円筒ラグ（型番未定）" and info["rod"].standard == "テンションロッド #12-24"
     assert info["holder"].standard == "L ロッド 12.7" and info["bolt_tip"].standard == "黒色 SUS 六角穴付きボルト M5"
     other = {p.name: p for p in parts(override(SPEC, mount__type="L ロッド 10.5"))}
     assert other["holder"].standard == "L ロッド 10.5"

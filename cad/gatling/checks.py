@@ -33,7 +33,7 @@ _POSITIVE = (
     "edge.angle", "edge.radius", "edge.height", "edge.width",
     "hoop.inner.thickness", "hoop.inner.height", "hoop.outer.od", "hoop.outer.thickness", "hoop.gap",
     "hoop.seat", "hoop.takeup", "hoop.ear.width", "hoop.ear.thickness",
-    "lug.pitch", "lug.height", "lug.standoff", "lug.hole_dia", "lug.rod_length", "lug.rod_head_dia", "lug.rod_head_height",
+    "lug.body_dia", "lug.foot_dia", "lug.height", "lug.standoff", "lug.hole_dia", "lug.rod_length", "lug.rod_head_dia", "lug.rod_head_height",
     "tube.od", "tube.thickness", "tube.length",
     "clamp.tip_thickness", "clamp.mid_thickness", "clamp.bolt_length",
     "header.thickness", "flange.thickness", "flange.bolt_seat", "flange.bolt_length", "plate.margin", "gasket.thickness",
@@ -278,14 +278,22 @@ def ear_fits(spec: GatlingSpec) -> list[Issue]:
 
 
 def lug_fits(spec: GatlingSpec) -> list[Issue]:
-    """胴の取付穴がラグの高さと胴の高さに収まり、ラグが胴バンドに重ならない。"""
-    z = levels(spec)
-    zc, half = (z.lug_top + z.lug_bottom) / 2, float(spec.lug.pitch) / 2 + float(spec.lug.hole_dia) / 2
-    return (at_least("ラグの取付穴が胴の下端（フランジ）にかかる", zc - half, z.flange_top)
-            + at_most("ラグの取付穴が胴の上端にかかる", zc + half, z.shell_top)
-            + at_least("ラグの取付穴がラグの高さから下に外れる", zc - half, z.lug_bottom)
-            + at_most("ラグの取付穴がラグの高さから上に外れる", zc + half, z.lug_top)
-            + at_least("ラグが胴バンドに重なる（ラグ下端とバンド上端の距離）", z.lug_bottom, z.band_top))
+    """胴の取付穴（ラグ 1 個に 1 つ、ラグの高さの中心）が胴の高さと台座に収まり、台座がラグの高さに収まる。
+    ラグの本体にロッドの穴の肉が残り、台座に穴の肉が残る。ラグが胴バンドに重ならない。"""
+    z, s = levels(spec), spec.lug
+    zc = (z.lug_top + z.lug_bottom) / 2
+    hole, foot = float(s.hole_dia) / 2, float(s.foot_dia) / 2
+    found = (at_least("ラグの取付穴が胴の下端（フランジ）にかかる", zc - hole, z.flange_top)
+             + at_most("ラグの取付穴が胴の上端にかかる", zc + hole, z.shell_top)
+             + at_least("ラグの台座がラグの高さから下に出る", zc - foot, z.lug_bottom)
+             + at_most("ラグの台座がラグの高さから上に出る", zc + foot, z.lug_top)
+             + at_least("ラグが胴バンドに重なる（ラグ下端とバンド上端の距離）", z.lug_bottom, z.band_top))
+    bore = float(lookup_rod(s.thread))
+    if float(s.body_dia) <= bore + EPS:
+        found.append(Issue(True, f"ラグの本体の径がロッドの穴径以下で、肉が残らない（{float(s.body_dia):.2f} ≤ {bore:.2f}）"))
+    if foot <= hole + EPS:
+        found.append(Issue(True, f"ラグの台座の径が胴の取付穴の径以下で、穴が台座に収まらない（{2 * foot:.2f} ≤ {2 * hole:.2f}）"))
+    return found
 
 
 def cradle_fits(spec: GatlingSpec) -> list[Issue]:

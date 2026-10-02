@@ -19,7 +19,7 @@ def bom(spec: GatlingSpec) -> list[BomRow]:
             for i in parts(spec) if i.made == "purchased"]
     lugs = int(float(spec.lug.count))
     rows += [
-        BomRow("ラグボルト", "purchased", None, "ラグ付属のねじ（胴の取付穴に通す）", "", LUG_HOLES * lugs, UNDECIDED),
+        BomRow("ラグボルト", "purchased", None, "ラグ付属のねじ（胴の取付穴に通し、ラグを 1 本で留める）", "", LUG_HOLES * lugs, UNDECIDED),
         BomRow("シール座金", "purchased", None, "ラグ穴のシール用", "", LUG_HOLES * lugs, UNDECIDED),
         BomRow("ゴムシート", "purchased", None, "胴バンドと胴の間に挟む", f"t{fmt(spec.band.rubber)}", BAND_SPLIT, UNDECIDED),
         BomRow(f"ボルト {spec.band.bolt.value}（クレードルの腕）", "purchased", None,

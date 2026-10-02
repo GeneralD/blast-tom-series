@@ -38,7 +38,8 @@ def test_a_choice_that_is_not_in_the_standard_table_is_fatal(path, value):
 
 
 @pytest.mark.parametrize("path", ["tube.od", "tube.length", "shell.plenum_height", "header.thickness", "cradle.bar.width", "head.fit_id",
-                                  "hoop.outer.od", "hoop.outer.thickness", "lug.rod_head_dia", "lug.rod_head_height"])
+                                  "hoop.outer.od", "hoop.outer.thickness", "lug.rod_head_dia", "lug.rod_head_height",
+                                  "lug.body_dia", "lug.foot_dia"])
 def test_a_dimension_that_is_zero_or_negative_is_fatal(path):
     for bad in (0, -1):
         assert any(path in w and "正" in w for w in _fatal(override(SPEC, **{path: bad}))), (path, bad)

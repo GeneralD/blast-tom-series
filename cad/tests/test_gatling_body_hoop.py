@@ -30,17 +30,17 @@ def test_the_shell_is_a_thin_ring_between_the_flange_top_and_the_edge_ring():
     assert s.solids().size() == 1 and (box.zmin, box.zmax) == pytest.approx((7, 107))
     assert box.xlen == pytest.approx(152, abs=1e-3)
     ring = math.pi / 4 * 100 * (152**2 - 149.6**2)
-    assert _volume(s) == pytest.approx(ring - 12 * math.pi * 2.5**2 * 1.2, rel=2e-3)     # 肉厚 1.2、取付穴 12
+    assert _volume(s) == pytest.approx(ring - 6 * math.pi * 2.5**2 * 1.2, rel=2e-3)      # 肉厚 1.2、取付穴 6（ラグ 1 個に 1 つ）
 
 
-def test_the_shell_has_two_mounting_holes_per_lug_at_the_lug_pitch():
+def test_the_shell_has_one_mounting_hole_per_lug_at_the_middle_of_the_lug_height():
     s = shell(SPEC)
     zc = (59.7905 + 94.7905) / 2                                   # ラグの高さの中央
     for angle in (0, 60, 120, 180, 240, 300):
         c, sn = math.cos(math.radians(angle)), math.sin(math.radians(angle))
-        for dz in (-12.5, 12.5):                                    # pitch 25
-            assert not _inside(s, 75.4 * c, 75.4 * sn, zc + dz)      # 穴（壁の中ほど）は空き
-        assert _inside(s, 75.4 * c, 75.4 * sn, zc)                   # 穴と穴の間は肉
+        assert not _inside(s, 75.4 * c, 75.4 * sn, zc)               # 穴（壁の中ほど）は空き
+        assert _inside(s, 75.4 * c, 75.4 * sn, zc + 12.5)            # 上下の旧い穴の位置は肉（穴は 1 つだけ）
+        assert _inside(s, 75.4 * c, 75.4 * sn, zc - 12.5)
     fewer = shell(override(SPEC, lug__count=3, hoop__ear__count=3))
     assert _volume(fewer) > _volume(s)                              # 穴が減れば肉は増える
 

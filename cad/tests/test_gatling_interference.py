@@ -33,7 +33,7 @@ from gatling_overlap import overlaps
     {"lug.height": 50.6, "cradle.clearance": 21,                                                      # 13. 耳のボルトの頭とラグ
      "band.bar.width": 6, "band.above_flange": 31.1905},
     {"lug.rod_head_height": 8}, {"hoop.outer.od": 5},                                           # 14. 受金が内リングに溶接できない・管に届かない
-    {"lug.rod_head_dia": 10.7}, {"lug.standoff": 11.5, "lug.rod_head_dia": 11},                       # 15. ロッドの頭と内リング・管
+    {"lug.rod_head_dia": 10.7}, {"lug.standoff": 11.5, "lug.rod_head_dia": 11.7},                       # 15. ロッドの頭と内リング・管
     {"lug.rod_length": 29.5},                                                                         # 16. ロッドがラグに届かない
     {"shell.plenum_height": 10},                                                                      # 17. フレームと外リング（管）
     {"lug.rod_length": 82},                                                                           # 18. ラグの下に出た軸と胴バンドの耳
@@ -46,6 +46,7 @@ from gatling_overlap import overlaps
      "lug.rod_length": 60.8},
     {"hoop.outer.od": 10, "mount.body_height": 48.3},                                                 # 23. ホルダー受けと受金
     {"hoop.inner.thickness": 0.9, "lug.standoff": 6, "lug.rod_head_dia": 7},                                                                 # 24. 受金とフレッシュフープ（内リングが薄い）
+    {"lug.body_dia": 30, "lug.height": 50},                                                           # 25. 円筒の本体（ロッドの外側へ広がる）とフレーム・当て板
 ])
 def test_an_override_that_breaks_the_shape_is_fatal(values):
     assert fatal_count(issues(override(SPEC, **values))) >= 1, values
@@ -73,6 +74,7 @@ def test_an_override_that_breaks_the_shape_is_fatal(values):
      "lug.rod_length": 60.6},
     {"hoop.outer.od": 10, "mount.body_height": 48.1},                                                   # 23 の内側
     {"hoop.inner.thickness": 1.0, "lug.standoff": 6, "lug.rod_head_dia": 7},                                                                # 24 の内側（受金の内端がフレッシュフープの外面ちょうど）
+    {"lug.body_dia": 24, "lug.height": 50},                                                           # 25 の内側（本体の外端 98 = フレームの内面ちょうど）
 ])
 def test_an_override_just_inside_the_checks_builds_without_any_overlap(values):
     spec = override(SPEC, **values)

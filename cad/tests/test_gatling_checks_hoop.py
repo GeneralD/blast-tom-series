@@ -101,16 +101,37 @@ def test_a_lug_that_hangs_onto_the_band_is_fatal():
     assert not any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__height=50.7))))
 
 
-def test_mounting_holes_that_run_past_the_ends_of_the_shell_are_fatal():
-    assert any("上端" in w for w in _fatal(lug_fits(override(SPEC, lug__pitch=60))))        # 77.29 + 32.5 > 107
-    assert any("下端" in w for w in _fatal(lug_fits(override(SPEC, lug__height=100, lug__pitch=100))))
+def test_the_mounting_hole_that_runs_past_the_ends_of_the_shell_is_fatal():
+    # ラグの高さの中心（既定 77.29）に穴が 1 つ。下端はフランジ上面 7、上端は胴の上端 107
+    assert not any("フランジ" in w for w in _fatal(lug_fits(override(SPEC, lug__height=150))))         # 中心 19.79、穴の下縁 17.29 > 7
+    assert any("フランジ" in w for w in _fatal(lug_fits(override(SPEC, lug__height=180))))             # 中心 4.79、穴の下縁 2.29 < 7
+    high = {"hoop.outer.od": 5, "head.collar_height": 1}                                         # ラグの上端が 111.19 に上がる
+    assert any("胴の上端" in w for w in _fatal(lug_fits(override(SPEC, lug__height=10, **high))))     # 中心 106.19、穴の上縁 108.69 > 107
+    assert not any("胴の上端" in w for w in _fatal(lug_fits(override(SPEC, lug__height=40, **high))))
 
 
-def test_mounting_holes_must_fall_inside_the_lug_body():
-    # ラグ z 59.79〜94.79（中央 77.29）。穴の外縁 = 中央 ± (pitch / 2 + 穴径 / 2) が収まるのは pitch + 穴径 ≤ 35 まで
-    assert any("ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__pitch=31))))
-    assert not any("ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__pitch=30))))
-    assert any("ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__pitch=40))))      # 高さ 35 を超えるピッチ
+def test_the_mounting_hole_must_fall_inside_the_foot():
+    """穴（φ5）は台座（φ12）の中に収まる。台座が穴より小さい（等しい）と、ねじの座が胴に残らない。"""
+    assert any("台座" in w and "穴" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=5))))
+    assert any("台座" in w and "穴" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=4))))
+    assert not any("台座" in w and "穴" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=5.1))))
+
+
+def test_the_foot_must_fit_the_lug_height():
+    """台座は穴の高さ（ラグの高さの中心）を軸にするので、台座の径がラグの高さを超えるとラグから出る。"""
+    assert any("台座" in w and "ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=35.1, lug__body_dia=40))))
+    assert not any("台座" in w and "ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=35, lug__body_dia=40))))
+    assert any("台座" in w and "ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__height=11))))      # 台座 φ12 > 高さ 11
+
+
+def test_the_body_must_leave_a_wall_around_the_rod_bore():
+    """ラグの本体（φ16）にロッドの穴（#12-24 = φ5.5）を通す。本体の径が穴径以下だと肉が残らない。"""
+    assert lug_fits(SPEC) == []
+    assert any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=5.5))))
+    assert any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=5))))
+    assert not any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=5.6))))
+    assert any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__thread="M5", lug__body_dia=4.9))))
+    assert not any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__thread="M5", lug__body_dia=5.1))))
 
 
 def test_the_inner_ring_must_bear_on_the_collar_and_not_on_the_film():

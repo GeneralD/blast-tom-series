@@ -26,10 +26,19 @@ def test_no_dimension_is_a_bare_number():
 
 def test_the_default_spec_has_unsettled_values_and_each_says_what_it_waits_for():
     pending = dict(unsettled(SPEC))
-    assert {"head.model", "head.fit_id", "lug.pitch", "lug.height", "lug.thread", "tube.length", "tube.gap_ratio",
+    assert {"head.model", "head.fit_id", "lug.body_dia", "lug.foot_dia", "lug.height", "lug.thread", "tube.length", "tube.gap_ratio",
             "mount.type", "hoop.inner.height", "hoop.inner.thickness", "lug.rod_head_dia", "lug.rod_head_height"} <= set(pending)
     assert all(leaf.note for leaf in pending.values())
-    assert "実物" in pending["lug.pitch"].note and "PR 4" in pending["tube.length"].note
+    assert "実物" in pending["lug.body_dia"].note and "実物" in pending["lug.foot_dia"].note and "PR 4" in pending["tube.length"].note
+
+
+def test_the_lug_is_a_single_hole_cylinder_lug_without_a_mounting_pitch():
+    """D-21: 胴にねじ 1 本で留める円筒ラグ。取付穴のピッチは葉に持たない。"""
+    leaves = dict(walk(SPEC))
+    assert "lug.pitch" not in leaves
+    assert (float(SPEC.lug.body_dia), float(SPEC.lug.foot_dia)) == (16, 12)
+    assert SPEC.lug.model.value == "単穴の円筒ラグ（型番未定）" and SPEC.lug.model.source is Source.PROVISIONAL
+    assert "DW" not in SPEC.lug.model.value
 
 
 def test_the_sources_follow_the_section_5_2_table():

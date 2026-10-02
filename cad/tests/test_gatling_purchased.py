@@ -28,13 +28,32 @@ def test_the_film_rests_on_the_bearing_edge_and_the_collar_hangs_outside_the_she
     assert not _inside(h, 76.1, 0, 112)                                         # 環の内面（r 76.2）と胴の外面（r 76）の間は空き
 
 
-def test_six_lugs_stand_outside_the_shell_a_takeup_below_the_collar_with_a_bore_for_the_rod():
+def test_six_cylinder_lugs_stand_outside_the_shell_each_with_a_foot_to_the_shell_and_a_bore_for_the_rod():
     part = lug(SPEC)
     box = _box(part)
+    zc = (59.7905 + 94.7905) / 2                                                 # ラグの高さの中心（胴の取付穴の高さ）
     assert part.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((59.7905, 94.7905))
-    assert _inside(part, 78, 0, 80) and not _inside(part, 86, 0, 80)           # 胴の脇の箱、ロッド穴は空き
-    assert not _inside(part, 75, 0, 80)                                          # 胴の中には入らない
-    assert part.solids().vals()[0].Volume() == pytest.approx(20 * 20 * 35 - math.pi * 2.75**2 * 35, rel=1e-6)
+    assert _inside(part, 86 + 5, 0, 80) and not _inside(part, 86 + 8.5, 0, 80)    # 本体は φ16（r 8）の縦の円筒
+    assert not _inside(part, 86 + 2, 0, 80) and _inside(part, 86 + 3, 0, 80)      # ロッドの穴は φ5.5（r 2.75）
+    assert _inside(part, 77, 0, zc + 5) and not _inside(part, 77, 0, zc + 7)      # 台座は φ12（r 6）で、ラグの高さの中心に軸がある
+    assert _inside(part, 77, 5.5, zc) and not _inside(part, 77, 6.5, zc)
+    assert not _inside(part, 75.9, 0, zc) and _inside(part, 76.1, 0, zc)          # 台座の胴側は胴の外面（r 76）で止まる
+    assert not _inside(part, 75.8, 5, zc)                                          # 横にずれても胴に食い込まない（円で沿う）
+    body = math.pi * (8**2 - 2.75**2) * 35
+    assert body < part.solids().vals()[0].Volume() < body + math.pi * 6**2 * 10    # 本体 + 台座。台座は本体の中を数えない
+
+
+def test_the_lug_is_one_solid_per_lug_even_when_the_body_reaches_the_shell():
+    """本体が胴の外面にかかる（standoff が本体の半径より小さい）ときも、胴の外面で切って食い込まない。1 個 1 solid のまま。"""
+    part = lug(override(SPEC, lug__standoff=5))
+    assert part.solids().size() == 6
+    assert not _inside(part, 75.9, 0, 80)                                          # 切らなければ本体（x 73〜89）が胴に入る
+
+
+def test_the_foot_follows_its_diameter():
+    thick = lug(override(SPEC, lug__foot_dia=14))
+    zc = (59.7905 + 94.7905) / 2
+    assert _inside(thick, 77, 0, zc + 6.5) and not _inside(thick, 77, 0, zc + 7.5)
 
 
 def test_six_tension_rods_hang_from_the_ear_top_with_the_head_on_the_ear():

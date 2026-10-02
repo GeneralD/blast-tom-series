@@ -6,8 +6,8 @@ import math
 
 import pytest
 from gatling.params import SPEC, override
-from gatling.placement import (flange_bolt_points, levels, lug_angles, pipe_inner_radius, radii, ring_points,
-                               tip_bolt_points, tube_points)
+from gatling.placement import (LUG_HOLE_SIDES, LUG_HOLES, flange_bolt_points, levels, lug_angles, lug_plan,
+                               pipe_inner_radius, radii, ring_points, tip_bolt_points, tube_points)
 
 
 def _angle(point):
@@ -159,3 +159,17 @@ def test_the_pipe_inner_surface_is_narrowest_at_the_pipe_centre_height():
     assert pipe_inner_radius(SPEC, z.ear_top, z.rod_top) == pytest.approx(head)              # 93.30
     assert pipe_inner_radius(SPEC, z.hoop_top, z.hoop_top + 10) == math.inf
     assert pipe_inner_radius(SPEC, z.lug_bottom, z.lug_top) == math.inf
+
+
+def test_a_lug_is_held_by_a_single_screw_at_the_middle_of_its_height():
+    assert LUG_HOLE_SIDES == (0,) and LUG_HOLES == 1
+
+
+def test_the_lug_plan_is_the_foot_and_the_square_around_the_body():
+    """平面形（ラグの局所座標 u, v）。台座は胴の外面からロッドの中心まで、幅は台座の径。本体はロッドの中心の周りの、
+    本体の径の正方形（円に外接）。どちらも形と同じ葉（standoff・foot_dia・body_dia）から作る。"""
+    foot, body = lug_plan(SPEC)
+    assert foot == pytest.approx((76, 86, -6, 6)) and body == pytest.approx((78, 94, -8, 8))
+    foot, body = lug_plan(override(SPEC, lug__standoff=6, lug__body_dia=20, lug__foot_dia=10))
+    assert foot == pytest.approx((76, 82, -5, 5))
+    assert body == pytest.approx((76, 92, -10, 10))        # 本体が胴の外面にかかるぶんは、胴の外面で切る
