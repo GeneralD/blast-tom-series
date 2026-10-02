@@ -225,3 +225,13 @@ def test_an_ear_that_does_not_reach_the_pipe_is_fatal():
     """管の下端 = フープの上端 − 外径。受金の上面（フープの上端 − 5）が管の下端以下だと、受金が管に届かず溶接できない。"""
     assert any("受金" in w and "届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=5))))
     assert not any("届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=5.1))))
+
+
+def test_a_lug_body_whose_radius_exceeds_the_standoff_is_a_warning_not_silently_clipped():
+    """本体の半径が standoff（胴の外面からロッドの中心）を超えると、本体が胴の外面で切られ、BOM の本体径と形が合わなくなる。"""
+    ok = lug_fits(override(SPEC, lug__body_dia=20))              # 半径 10 = standoff 10（縁ちょうど）
+    assert not any("本体" in i.what and "胴の外面" in i.what for i in ok)
+    for dia in (20.5, 24):
+        found = lug_fits(override(SPEC, lug__body_dia=dia))
+        hit = [i for i in found if "本体" in i.what and "胴の外面" in i.what]
+        assert len(hit) == 1 and not hit[0].fatal, found

@@ -165,11 +165,13 @@ def test_a_lug_is_held_by_a_single_screw_at_the_middle_of_its_height():
     assert LUG_HOLE_SIDES == (0,) and LUG_HOLES == 1
 
 
-def test_the_lug_plan_is_the_foot_and_the_square_around_the_body():
-    """平面形（ラグの局所座標 u, v）。台座は胴の外面からロッドの中心まで、幅は台座の径。本体はロッドの中心の周りの、
-    本体の径の正方形（円に外接）。どちらも形と同じ葉（standoff・foot_dia・body_dia）から作る。"""
+def test_the_lug_plan_is_the_foot_rectangle_and_the_body_circle():
+    """平面形（ラグの局所座標 u, v）。台座の矩形は、胴の外面の円で切られる側縁の根元（u = R − (R − √(R² − f²))）から
+    ロッドの中心まで、幅は台座の径。本体はロッドの中心の円（中心 u、半径 body_dia / 2）。形と同じ葉（standoff・foot_dia・body_dia）から作る。"""
     foot, body = lug_plan(SPEC)
-    assert foot == pytest.approx((76, 86, -6, 6)) and body == pytest.approx((78, 94, -8, 8))
+    shell = 76.0
+    assert foot == pytest.approx((shell - (shell - math.sqrt(shell**2 - 6**2)), 86, -6, 6)) and foot[0] < shell
+    assert body == pytest.approx((86, 8))
     foot, body = lug_plan(override(SPEC, lug__standoff=6, lug__body_dia=20, lug__foot_dia=10))
-    assert foot == pytest.approx((76, 82, -5, 5))
-    assert body == pytest.approx((76, 92, -10, 10))        # 本体が胴の外面にかかるぶんは、胴の外面で切る
+    assert foot == pytest.approx((shell - (shell - math.sqrt(shell**2 - 5**2)), 82, -5, 5))
+    assert body == pytest.approx((82, 10))

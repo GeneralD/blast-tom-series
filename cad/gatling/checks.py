@@ -285,8 +285,9 @@ def lug_fits(spec: GatlingSpec) -> list[Issue]:
     hole, foot = float(s.hole_dia) / 2, float(s.foot_dia) / 2
     found = (at_least("ラグの取付穴が胴の下端（フランジ）にかかる", zc - hole, z.flange_top)
              + at_most("ラグの取付穴が胴の上端にかかる", zc + hole, z.shell_top)
-             + at_least("ラグの台座がラグの高さから下に出る", zc - foot, z.lug_bottom)
-             + at_most("ラグの台座がラグの高さから上に出る", zc + foot, z.lug_top)
+             # 台座の軸はラグの高さの中心にあり上下対称なので、下側だけ見れば上側も同じ
+             + at_least("ラグの台座がラグの高さから出る", zc - foot, z.lug_bottom)
+             + at_most("ラグの本体が胴の外面にかかり、胴の外面で切られる（本体の半径 > standoff）", float(s.body_dia) / 2, float(s.standoff), fatal=False)
              + at_least("ラグが胴バンドに重なる（ラグ下端とバンド上端の距離）", z.lug_bottom, z.band_top))
     bore = float(lookup_rod(s.thread))
     if float(s.body_dia) <= bore + EPS:

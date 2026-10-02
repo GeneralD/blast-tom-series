@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numbers
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
@@ -33,8 +34,9 @@ class PartInfo:
     opacity: float = 1.0           # viewer の不透明度（0 < opacity ≤ 1）。1 未満は半透明に描く。見た目だけで、形・質量・BOM には効かない
 
     def __post_init__(self) -> None:
+        # 数値以外（文字列・None・複素数・bool）は比較が生の TypeError になるので先に弾く。
         # nan は比較がすべて偽になるので、「範囲内」を肯定形で書いて弾く
-        if not 0 < self.opacity <= 1:
+        if isinstance(self.opacity, bool) or not isinstance(self.opacity, numbers.Real) or not 0 < self.opacity <= 1:
             raise ValueError(f"部品 {self.label} の opacity {self.opacity} は 0 より大きく 1 以下でなければならない")
 
 

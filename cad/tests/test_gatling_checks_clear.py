@@ -30,7 +30,7 @@ def test_a_lug_that_just_clears_the_holder_passes():
 
 
 def test_a_lug_that_reaches_down_to_the_pad_is_fatal():
-    # ラグ 12 個。ラグ（z 63.79〜98.79）は当て板（z 60〜66）と z が重なり、270° のラグ（y −76〜−96）が当て板（y −86〜）に入る。
+    # ラグ 12 個。ラグ（z 63.79〜98.79）は当て板（z 60〜66）と z が重なり、270° のラグ（y −78〜−94 の本体）が当て板（y −86〜）に入る。
     # ホルダーは逃げ 21 で避けておく
     found = _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=21))
     assert any("ラグ" in w and "当て板" in w for w in found), found
@@ -144,3 +144,14 @@ def test_a_holder_seat_that_reaches_the_ear_beside_a_thin_tube_is_fatal():
     found = [w for w in _fatal(override(SPEC, hoop__outer__od=10, mount__body_height=48.3))]
     assert len(found) == 1 and "受金" in found[0] and "外半径 96.22" in found[0], found
     assert _fatal(override(SPEC, hoop__outer__od=10, mount__body_height=48.1)) == []
+
+
+@pytest.mark.parametrize("leaves", [
+    {"lug.body_dia": 25.153, "lug.foot_dia": 7.527, "cradle.clearance": 11.383},
+    {"lug.body_dia": 20, "cradle.clearance": 6, "lug.foot_dia": 8},
+    {"lug.body_dia": 22, "cradle.clearance": 8},
+])
+def test_a_round_lug_body_that_clears_the_pad_is_not_judged_by_its_circumscribed_square(leaves):
+    """本体は円柱。外接する正方形の角（最大 0.41 × 半径）で、当たっていない当て板を fatal にしない（実形状の lug と pad は離れている）。"""
+    found = _fatal(override(SPEC, **{k.replace(".", "__"): v for k, v in leaves.items()}))
+    assert not any("ラグ" in w and "当て板" in w for w in found), found

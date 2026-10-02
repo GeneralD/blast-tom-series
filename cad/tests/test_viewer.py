@@ -92,7 +92,7 @@ def test_a_part_opacity_is_embedded_and_defaults_to_opaque():
 
 def test_the_viewer_draws_a_translucent_part_without_writing_depth_and_keeps_opaque_ones_as_before(demo):
     _, _, html = demo
-    assert "transparent: p.opacity < 1" in html and "depthWrite: p.opacity >= 1" in html
+    assert html.count("transparent: p.opacity < 1") == 2 and html.count("depthWrite: p.opacity >= 1") == 2      # メッシュと線の両方
     assert "opacity: p.opacity" in html
     assert "transparent: true" not in html                                       # 不透明の部品に透明を掛けない
 
@@ -114,3 +114,11 @@ def test_an_opacity_out_of_range_is_rejected(bad):
 def test_an_opacity_in_range_is_accepted(ok):
     info = next(iter(discover(TESTS)["demo"].parts()))
     assert replace(info, opacity=ok).opacity == ok
+
+
+@pytest.mark.parametrize("bad", ["0.5", None, "abc", [0.5], 0.5 + 0j, True])
+def test_a_non_numeric_opacity_is_rejected_with_the_part_and_the_word(bad):
+    info = {p.name: p for p in discover(TESTS)["demo"].parts()}["plate"]
+    with pytest.raises(ValueError, match="opacity") as e:
+        replace(info, opacity=bad)
+    assert info.label in str(e.value)

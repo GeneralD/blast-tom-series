@@ -38,7 +38,6 @@ def test_the_lug_is_a_single_hole_cylinder_lug_without_a_mounting_pitch():
     assert "lug.pitch" not in leaves
     assert (float(SPEC.lug.body_dia), float(SPEC.lug.foot_dia)) == (16, 12)
     assert SPEC.lug.model.value == "単穴の円筒ラグ（型番未定）" and SPEC.lug.model.source is Source.PROVISIONAL
-    assert "DW" not in SPEC.lug.model.value
 
 
 def test_the_sources_follow_the_section_5_2_table():

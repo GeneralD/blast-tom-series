@@ -181,18 +181,22 @@ def pipe_inner_radius(spec: GatlingSpec, z0: float, z1: float) -> float:
     return r.hoop_out_centre - math.sqrt(half * half - d * d)
 
 
-def lug_plan(spec: GatlingSpec) -> list[tuple[float, float, float, float]]:
-    """ラグの平面形（ラグの局所座標）を、凸の矩形の組で返す（干渉の検査用。形と同じ葉から作る）。
+def lug_plan(spec: GatlingSpec) -> tuple[tuple[float, float, float, float], tuple[float, float]]:
+    """ラグの平面形（ラグの局所座標）を、台座の矩形と本体の円で返す（干渉の検査用。形と同じ葉から作る）。
 
-    u は胴の中心からラグの方位へ、v はそれに直交（反時計回りが正）。(u0, u1, v0, v1) の組:
-    1. 台座: 胴の外面からロッドの中心まで、幅は台座の径。
-    2. 本体: ロッドの中心の周りの、本体の径の正方形（円に外接。保守側）。胴の外面にかかるぶんは胴の外面で切る（形も同じ）。
+    u は胴の中心からラグの方位へ、v はそれに直交（反時計回りが正）。返すのは (台座, 本体):
+    1. 台座 (u0, u1, v0, v1): 胴の外面からロッドの中心まで、幅は台座の径。台座は円柱を胴の外面の円で切るので、
+       側縁（v = ±f）では胴に u = √(R² − f²) < R で触れる。矩形の u0 はそこまで広げる（形から出る三日月を取りこぼさない）。
+    2. 本体 (u, 半径): ロッドの中心 (u = 胴の半径 + standoff, v = 0) の、本体の径の円。胴の外面にかかるぶんは
+       胴の外面で切られる（形も同じ）が、円は切らずに見る（保守側。かかる設定は `lug_fits` が警告する）。
     方位 a のラグの平面座標は x = u cos a − v sin a、y = u sin a + v cos a（`lug_angles` の向き）。
     """
     s = spec.lug
-    shell, rod = float(derive(spec).shell_od) / 2, float(derive(spec).shell_od) / 2 + float(s.standoff)
+    shell = float(derive(spec).shell_od) / 2
+    rod = shell + float(s.standoff)
     foot, body = float(s.foot_dia) / 2, float(s.body_dia) / 2
-    return [(shell, rod, -foot, foot), (max(shell, rod - body), rod + body, -body, body)]
+    root = math.sqrt(max(shell * shell - foot * foot, 0.0))
+    return (root, rod, -foot, foot), (rod, body)
 
 
 def band_tab_length(spec: GatlingSpec) -> float:
