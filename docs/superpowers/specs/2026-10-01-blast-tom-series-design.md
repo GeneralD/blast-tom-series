@@ -214,7 +214,7 @@ def acoustic_model(spec) -> AcousticModel      # drumcad.acoustics に渡すモ�
 | `lug.body_dia` | 30 | `provisional` | 円盤（胴の外から見て丸い。軸は胴の半径方向）の径。ラグの高さを兼ねる。置き値（実物を測るまで）。ロッドの穴径と胴の取付穴の径（`lug.hole_dia`）より大きい（§5.3） |
 | `lug.depth` | 20 | `provisional` | 円盤の厚み（半径方向。胴の外面から外側の面まで）。置き値（実物を測るまで）。ロッドの通る位置（`lug.standoff` + ロッドの半径）が収まる（§5.3） |
 | `lug.standoff` | 10 | `provisional` | 胴外面からロッド中心まで。ロッドの頭が内リングと管の間に収まる値に置いた（D-20） |
-| `lug.rod_length` / `lug.rod_head_dia` / `lug.rod_head_height` | 50 / 9 / 5 | `provisional` | テンションロッドの軸の長さ（頭の下面から先端まで）と頭の寸法。実物を測るまで。必要長は 60.4（§5.3）で、50 なら軸の先はラグの中（z 70.19、ラグは 59.79〜94.79）に収まる |
+| `lug.rod_length` / `lug.rod_head_dia` / `lug.rod_head_height` | 50 / 9 / 5 | `provisional` | テンションロッドの軸の長さ（頭の下面から先端まで）と頭の寸法。実物を測るまで。必要長は 55.4（§5.3）で、50 なら軸の先はラグの中（z 70.19、ラグは 64.79〜94.79）に収まる |
 | `lug.count` | 6 | `design` | 出力名の `<ラグ数>` |
 | `tube.count` | 6 | `design` | D-09 |
 | `tube.od` / `tube.thickness` | 38.1 / 1.2 | `design` | `stock.nearest` を通す |
