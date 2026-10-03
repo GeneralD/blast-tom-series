@@ -28,13 +28,13 @@ def head(spec: GatlingSpec) -> cq.Workplane:
 def lug(spec: GatlingSpec) -> cq.Workplane:
     """ラグ（タレット形）。胴の外から見て丸い円盤で、軸は胴の半径方向。円盤の中心を胴の内側から 1 本のねじで留める。
     円盤は径 `body_dia`、胴の外面から外側の面まで `depth`、中心の高さはラグの高さ帯の中心（胴の取付穴の高さ）。
-    胴側は胴の外面の円柱で切って、食い込まず離れず沿わせる。ロッドの穴（呼び径）は円盤の上端から下端まで縦に通す
-    （ロッドの先の高さは `checks.rod_fits` が見る。穴が貫通なので、先がどこにあっても軸が円盤に食い込まない）。"""
+    胴側は胴の外面の円柱で切って、食い込まず離れず沿わせる。ロッドの穴（呼び径）は円盤の上端から縦に開く止まり穴で、
+    底はロッドの軸の先（円盤の下端より下に出る設定では下端まで通る。先がラグの上端からねじ込み代まで届くかは `checks.rod_fits` が見る）。"""
     z, r, s = levels(spec), radii(spec), spec.lug
     zc = (z.lug_top + z.lug_bottom) / 2
     # 軸の上の胴の中心から始めて外側の面まで伸ばし、胴の外面の円柱で切る（円弧に沿わせる。外側の面は胴の外面から depth の平面）
     disc = cylinder((0, 0, zc), (1, 0, 0), float(s.body_dia), r.shell + float(s.depth))
-    bore = cylinders([(r.rod, 0)], float(lookup_rod(s.thread)), z.lug_bottom, z.lug_top)
+    bore = cylinders([(r.rod, 0)], float(lookup_rod(s.thread)), max(z.rod_tip, z.lug_bottom), z.lug_top)   # 底 = 軸の先（軸が穴を埋める）
     solid = disc.cut(bore).cut(cylinders([(0, 0)], 2 * r.shell, z.lug_bottom - 1, z.lug_top + 1))   # 円盤の上下の接線を避けて 1 mm 広く
     return around_z(solid, lug_angles(spec))
 

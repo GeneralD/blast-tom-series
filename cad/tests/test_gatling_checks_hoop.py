@@ -197,6 +197,8 @@ def test_too_many_ears_and_lugs_run_into_each_other():
     assert spacing(override(SPEC, lug__body_dia=19.5, lug__count=24, hoop__ear__count=24)) == []
     assert any("ラグ" in w for w in _fatal(spacing(override(SPEC, lug__count=24, hoop__ear__count=24))))      # 既定の円盤 φ30 は 24 個で隣と重なる
     assert spacing(override(SPEC, lug__count=12, hoop__ear__count=12)) == []
+    # 内端が側縁の根元（75.35）か胴の半径（76）かで分かれる径: 24 個の許容幅は 19.84 と 20.01。19.9 は根元なら重なる
+    assert any("ラグ" in w for w in _fatal(spacing(override(SPEC, lug__body_dia=19.9, lug__count=24, hoop__ear__count=24))))
     assert spacing(SPEC) == [] and spacing(override(SPEC, lug__count=2, hoop__ear__count=2)) == []
 
 

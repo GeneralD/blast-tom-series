@@ -47,7 +47,7 @@ class BomRow:
     name: str
     made: Made
     material: Material | None
-    standard: str          # 規格・型番の系統（例: 円筒ラグ、手すり用 #400 研磨管）
+    standard: str          # 規格・型番の系統（例: 丸形ラグ、手すり用 #400 研磨管）
     dimensions: str        # 例: φ38.1 × t1.2 × L450
     count: int
     part_number: str = ""

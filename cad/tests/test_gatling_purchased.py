@@ -30,7 +30,7 @@ def test_the_film_rests_on_the_bearing_edge_and_the_collar_hangs_outside_the_she
 
 def test_six_turret_lugs_are_discs_on_the_shell_each_with_a_vertical_bore_for_the_rod():
     """円盤の軸は半径方向（胴の外から見て丸い）。胴側は胴の外面（r 76）で止まり、外側の面は胴の外面から depth 20（x = 96）。
-    ロッドの穴（φ5.5）は円盤の上端から下端まで縦に通る（ロッドの先の高さによらず、軸が円盤に食い込まない）。"""
+    ロッドの穴（φ5.5）は円盤の上端から縦に開く止まり穴で、底はロッドの軸の先（z 70.19。円盤の下端 64.79 より上）。"""
     part = lug(SPEC)
     box = _box(part)
     zc = (64.7905 + 94.7905) / 2                                                 # 円盤の中心の高さ（胴の取付穴の高さ）
@@ -42,10 +42,17 @@ def test_six_turret_lugs_are_discs_on_the_shell_each_with_a_vertical_bore_for_th
     assert not _inside(part, 75.9, 0, zc) and _inside(part, 76.1, 0, zc)          # 胴側は胴の外面で止まる
     assert not _inside(part, 75.8, 5, zc) and _inside(part, 76.3, 5, zc)          # 横にずれても胴に食い込まない（円で沿う）
     assert not _inside(part, 86 + 2, 0, zc) and _inside(part, 86 + 3, 0, zc)      # ロッドの穴は φ5.5（r 2.75）
-    assert not _inside(part, 86, 0, zc + 10) and not _inside(part, 86, 0, zc - 10)   # 穴は円盤の上端から下端まで通る
+    assert not _inside(part, 86, 0, zc + 14.9) and not _inside(part, 86, 0, 70.3)   # 穴は円盤の上端から軸の先まで開く
+    assert _inside(part, 86, 0, 70.0) and _inside(part, 86, 0, 65)                  # 軸の先より下は肉が残る（止まり穴）
     assert _inside(part, 90, 0, zc + 10) and _inside(part, 90, 0, zc - 10)
     disc = math.pi * 15**2 * 20
-    assert disc - math.pi * 2.75**2 * 30 < part.solids().vals()[0].Volume() < disc + 1000   # 円盤 + 胴の外面の円弧から出る三日月
+    assert disc - math.pi * 2.75**2 * (94.7905 - 70.1905) < part.solids().vals()[0].Volume() < disc + 1000   # 円盤 + 胴の外面の円弧から出る三日月
+
+
+def test_the_bore_is_through_only_when_the_rod_tip_sticks_out_below_the_disc():
+    """軸の先が円盤の下端より下（警告になる設定）なら、穴は下端まで通る（穴の底を円盤の外に出さない）。"""
+    long = lug(override(SPEC, lug__rod_length=70))
+    assert not _inside(long, 86, 0, 65) and not _inside(long, 86, 0, 94)
 
 
 def test_the_lugs_stand_round_about_the_shell_at_the_lug_angles():

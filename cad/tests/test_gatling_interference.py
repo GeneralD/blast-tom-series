@@ -82,6 +82,16 @@ def test_an_override_just_inside_the_checks_builds_without_any_overlap(values):
     assert overlaps(spec) == []
 
 
+@pytest.mark.parametrize("values, what", [
+    ({"cradle.pad.width": 95}, "ラグが当て板に当たる"),                                               # 当て板だけ（ホルダー受けは外れている）
+    ({"lug.count": 12, "hoop.ear.count": 12, "lug.body_dia": 19.5, "cradle.clearance": 16}, "ラグがホルダー受けに当たる"),   # ホルダー受けだけ
+])
+def test_each_lug_interference_check_alone_is_what_makes_the_override_fatal(values, what):
+    """3 つの判定（当て板・ホルダー受け）を、それぞれ単独の理由で fatal にする設定。判定を消すと通ってしまう。"""
+    fatals = [i.what for i in issues(override(SPEC, **values)) if i.fatal]
+    assert len(fatals) == 1 and fatals[0].startswith(what), fatals
+
+
 def test_the_default_has_no_fatal_no_overlap_and_only_the_two_known_warnings():
     """既定の警告は受金のロッド通し穴の径方向の肉（内側・外側）の 2 件だけ。リムを浅くしても増えない。"""
     found = issues(SPEC)
