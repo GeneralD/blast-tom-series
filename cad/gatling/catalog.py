@@ -55,7 +55,7 @@ def parts(spec: GatlingSpec) -> list[PartInfo]:
         fab("shell", "プレナム胴", "#c9ced6", 1, "radial", (0, 0, 0), f"{sheet}を丸めて TIG 突合せ",
             f"φ{fmt(d.shell_od)} × t{fmt(s.thickness)} × H{fmt(s.plenum_height)}"),
         buy("lug", "ラグ", "#6b7280", n_lug, (0, 0, 0), spec.lug.model.value,
-            f"本体 φ{fmt(spec.lug.body_dia)} × H{fmt(spec.lug.height)}、台座 φ{fmt(spec.lug.foot_dia)}"),
+            f"φ{fmt(spec.lug.body_dia)} × 厚み{fmt(spec.lug.depth)}"),
         buy("rod", "テンションロッド", "#8b93a0", n_lug, (0, 0, 0.3), f"テンションロッド {spec.lug.thread.value}",
             f"L{fmt(spec.lug.rod_length)}（頭 φ{fmt(spec.lug.rod_head_dia)} × H{fmt(spec.lug.rod_head_height)}）"),
         fab("band", "胴バンド", "#b6bcc6", BAND_SPLIT, "none", (0, 0, 0), f"{bar} {fmt(spec.band.bar.width)} × {fmt(spec.band.bar.thickness)}（{BAND_SPLIT} 分割）",

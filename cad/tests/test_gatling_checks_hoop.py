@@ -59,12 +59,12 @@ def test_the_shortest_rod_follows_every_height_between_the_ear_and_the_lug(path,
 
 
 def test_a_rod_that_runs_out_of_the_lug_bottom_is_a_warning():
-    """必要長（受金の上面からラグの下端まで）= 25.4 − 5 + 5 + 35 = 60.4。軸の先がこれより下に出ると警告。"""
+    """必要長（受金の上面からラグの下端まで）= 25.4 − 5 + 5 + 30 = 55.4。軸の先がこれより下に出ると警告。"""
     z = levels(SPEC)
-    assert z.ear_top - z.lug_bottom == pytest.approx(60.4)
-    found = rod_fits(override(SPEC, lug__rod_length=60.5))
+    assert z.ear_top - z.lug_bottom == pytest.approx(55.4)
+    found = rod_fits(override(SPEC, lug__rod_length=55.5))
     assert not _fatal(found) and any("ラグの下端" in i.what for i in found)
-    assert rod_fits(override(SPEC, lug__rod_length=60.4)) == []
+    assert rod_fits(override(SPEC, lug__rod_length=55.4)) == []
 
 
 def test_the_rod_head_top_sits_exactly_at_the_hoop_top_so_it_never_warns_about_the_rim():
@@ -96,42 +96,45 @@ def test_a_rod_head_no_larger_than_the_ear_hole_falls_through():
 
 
 def test_a_lug_that_hangs_onto_the_band_is_fatal():
-    # ラグの上端 94.79。高さ 50.79 で下端がバンド上端 44 にちょうど届く
-    assert any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__height=50.9))))
-    assert not any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__height=50.7))))
+    # ラグの上端 94.79。円盤の径 50.79 で下端がバンド上端 44 にちょうど届く
+    assert any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=50.9))))
+    assert not any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=50.7))))
 
 
 def test_the_mounting_hole_that_runs_past_the_ends_of_the_shell_is_fatal():
-    # ラグの高さの中心（既定 77.29）に穴が 1 つ。下端はフランジ上面 7、上端は胴の上端 107
-    assert not any("フランジ" in w for w in _fatal(lug_fits(override(SPEC, lug__height=150))))         # 中心 19.79、穴の下縁 17.29 > 7
-    assert any("フランジ" in w for w in _fatal(lug_fits(override(SPEC, lug__height=180))))             # 中心 4.79、穴の下縁 2.29 < 7
+    # 円盤の中心の高さ（既定 79.79 = 上端 − 円盤の径 / 2）に穴が 1 つ。下端はフランジ上面 7、上端は胴の上端 107
+    assert not any("フランジ" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=170))))       # 中心 9.79、穴の下縁 7.29 > 7
+    assert any("フランジ" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=180))))           # 中心 4.79、穴の下縁 2.29 < 7
     high = {"hoop.outer.od": 5, "head.collar_height": 1}                                         # ラグの上端が 111.19 に上がる
-    assert any("胴の上端" in w for w in _fatal(lug_fits(override(SPEC, lug__height=10, **high))))     # 中心 106.19、穴の上縁 108.69 > 107
-    assert not any("胴の上端" in w for w in _fatal(lug_fits(override(SPEC, lug__height=40, **high))))
+    assert any("胴の上端" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=10, **high))))     # 中心 106.19、穴の上縁 108.69 > 107
+    assert not any("胴の上端" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=40, **high))))
 
 
-def test_the_mounting_hole_must_fall_inside_the_foot():
-    """穴（φ5）は台座（φ12）の中に収まる。台座が穴より小さい（等しい）と、ねじの座が胴に残らない。"""
-    assert any("台座" in w and "穴" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=5))))
-    assert any("台座" in w and "穴" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=4))))
-    assert not any("台座" in w and "穴" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=5.1))))
+def test_the_mounting_hole_must_fall_inside_the_disc():
+    """取付穴（φ5）は円盤（φ30）の中に収まる。円盤が穴以下だと、ねじの座が円盤に残らない。"""
+    assert any("円盤" in w and "穴" in w for w in _fatal(lug_fits(override(SPEC, lug__hole_dia=30))))
+    assert any("円盤" in w and "穴" in w for w in _fatal(lug_fits(override(SPEC, lug__hole_dia=31))))
+    assert not any("円盤" in w and "穴" in w for w in _fatal(lug_fits(override(SPEC, lug__hole_dia=29.9))))
 
 
-def test_the_foot_must_fit_the_lug_height():
-    """台座は穴の高さ（ラグの高さの中心）を軸にするので、台座の径がラグの高さを超えるとラグから出る。"""
-    assert any("台座" in w and "ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=35.1, lug__body_dia=40))))
-    assert not any("台座" in w and "ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__foot_dia=35, lug__body_dia=40))))
-    assert any("台座" in w and "ラグの高さ" in w for w in _fatal(lug_fits(override(SPEC, lug__height=11))))      # 台座 φ12 > 高さ 11
-
-
-def test_the_body_must_leave_a_wall_around_the_rod_bore():
-    """ラグの本体（φ16）にロッドの穴（#12-24 = φ5.5）を通す。本体の径が穴径以下だと肉が残らない。"""
+def test_the_rod_must_pass_inside_the_disc_depth():
+    """ロッドの通る位置（胴の外面から standoff 10、ロッドの半径 2.75）が円盤の厚み depth 20 の中。外縁 12.75 を超えると円盤の外面から出る。"""
     assert lug_fits(SPEC) == []
-    assert any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=5.5))))
-    assert any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=5))))
-    assert not any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=5.6))))
-    assert any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__thread="M5", lug__body_dia=4.9))))
-    assert not any("本体" in w for w in _fatal(lug_fits(override(SPEC, lug__thread="M5", lug__body_dia=5.1))))
+    assert any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__depth=12.7))))
+    assert any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__standoff=17.3))))
+    assert not any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__depth=12.8))))
+    assert not any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__standoff=17.2))))
+    assert any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__thread="M5", lug__depth=12.4))))      # M5 は φ5、外縁 12.5
+
+
+def test_the_disc_must_leave_a_wall_around_the_rod_bore():
+    """円盤（φ30）にロッドの穴（#12-24 = φ5.5）を通す。円盤の径が穴径以下だと、ロッドの外縁が円盤の幅の外に出て肉が残らない。"""
+    assert lug_fits(SPEC) == []
+    assert any("円盤" in w and "ロッド" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=5.5, lug__hole_dia=2))))
+    assert any("円盤" in w and "ロッド" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=5, lug__hole_dia=2))))
+    assert not any("円盤" in w and "ロッド" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=5.6, lug__hole_dia=2))))
+    assert any("円盤" in w and "ロッド" in w for w in _fatal(lug_fits(override(SPEC, lug__thread="M5", lug__body_dia=4.9, lug__hole_dia=2))))
+    assert not any("円盤" in w and "ロッド" in w for w in _fatal(lug_fits(override(SPEC, lug__thread="M5", lug__body_dia=5.1, lug__hole_dia=2))))
 
 
 def test_the_inner_ring_must_bear_on_the_collar_and_not_on_the_film():
@@ -185,12 +188,15 @@ def test_a_thin_radial_wall_beside_the_rod_hole_is_only_a_warning():
 
 def test_too_many_ears_and_lugs_run_into_each_other():
     """隣り合う矩形は内側の端で先に当たる。幅 ≤ 2 × 内端の半径 × tan(180° / 個数)。
-    受金（幅 20、内端 = 内リングの外面 r 80.7）は 25 個まで、ラグ（幅 20、内端 r 76）は 24 個まで。"""
-    found = _fatal(spacing(override(SPEC, lug__count=26, hoop__ear__count=26)))
+    受金（幅 20、内端 = 内リングの外面 r 80.7）は 25 個まで。ラグは円盤の径 d が幅で、内端は胴の外面の円で切られる側縁の根元
+    （半径 √(76² − (d / 2)²)）。d = 19.5 なら 24 個まで（19.5 ≤ 2 × 75.37 × tan 7.5° = 19.85）、25 個（19.04）で当たる。既定の d = 30 は 12 個まで。"""
+    found = _fatal(spacing(override(SPEC, **{"lug__body_dia": 19.5, "lug__count": 26, "hoop__ear__count": 26})))
     assert any("受金" in w for w in found) and any("ラグ" in w for w in found), found
-    found = _fatal(spacing(override(SPEC, lug__count=25, hoop__ear__count=25)))
+    found = _fatal(spacing(override(SPEC, lug__body_dia=19.5, lug__count=25, hoop__ear__count=25)))
     assert any("ラグ" in w for w in found) and not any("受金" in w for w in found), found
-    assert spacing(override(SPEC, lug__count=24, hoop__ear__count=24)) == []
+    assert spacing(override(SPEC, lug__body_dia=19.5, lug__count=24, hoop__ear__count=24)) == []
+    assert any("ラグ" in w for w in _fatal(spacing(override(SPEC, lug__count=24, hoop__ear__count=24))))      # 既定の円盤 φ30 は 24 個で隣と重なる
+    assert spacing(override(SPEC, lug__count=12, hoop__ear__count=12)) == []
     assert spacing(SPEC) == [] and spacing(override(SPEC, lug__count=2, hoop__ear__count=2)) == []
 
 
@@ -227,11 +233,3 @@ def test_an_ear_that_does_not_reach_the_pipe_is_fatal():
     assert not any("届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=5.1))))
 
 
-def test_a_lug_body_whose_radius_exceeds_the_standoff_is_a_warning_not_silently_clipped():
-    """本体の半径が standoff（胴の外面からロッドの中心）を超えると、本体が胴の外面で切られ、BOM の本体径と形が合わなくなる。"""
-    ok = lug_fits(override(SPEC, lug__body_dia=20))              # 半径 10 = standoff 10（縁ちょうど）
-    assert not any("本体" in i.what and "胴の外面" in i.what for i in ok)
-    for dia in (20.5, 24):
-        found = lug_fits(override(SPEC, lug__body_dia=dia))
-        hit = [i for i in found if "本体" in i.what and "胴の外面" in i.what]
-        assert len(hit) == 1 and not hit[0].fatal, found

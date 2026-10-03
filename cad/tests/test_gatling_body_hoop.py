@@ -33,9 +33,9 @@ def test_the_shell_is_a_thin_ring_between_the_flange_top_and_the_edge_ring():
     assert _volume(s) == pytest.approx(ring - 6 * math.pi * 2.5**2 * 1.2, rel=2e-3)      # 肉厚 1.2、取付穴 6（ラグ 1 個に 1 つ）
 
 
-def test_the_shell_has_one_mounting_hole_per_lug_at_the_middle_of_the_lug_height():
+def test_the_shell_has_one_mounting_hole_per_lug_at_the_centre_of_the_lug_disc():
     s = shell(SPEC)
-    zc = (59.7905 + 94.7905) / 2                                   # ラグの高さの中央
+    zc = (64.7905 + 94.7905) / 2                                   # 円盤の中心の高さ
     for angle in (0, 60, 120, 180, 240, 300):
         c, sn = math.cos(math.radians(angle)), math.sin(math.radians(angle))
         assert not _inside(s, 75.4 * c, 75.4 * sn, zc)               # 穴（壁の中ほど）は空き

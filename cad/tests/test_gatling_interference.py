@@ -20,7 +20,7 @@ from gatling_overlap import overlaps
     {"flange.bolt_phase": float("inf")},                                                              # 2. 非有限の位相
     {"lug.count": 4, "hoop.ear.count": 4}, {"lug.count": 8, "hoop.ear.count": 8},                     # 3. ラグとホルダー受け
     {"lug.count": 12, "hoop.ear.count": 12},
-    {"lug.height": 50, "cradle.clearance": 8},                                                        # 4. ラグとフレーム
+    {"lug.body_dia": 50, "cradle.clearance": 8},                                                      # 4. ラグとフレーム
     {"hoop.inner.thickness": 0.5, "hoop.seat": 1.5, "lug.standoff": 4},                               # 5. ロッドとフレッシュフープ
     {"hoop.ear.width": 5},                                                                            # 6. 受金が割れる
     {"tube.gap_ratio": 0.1}, {"tube.gap_ratio": 0.18},                                                # 7. 先端のボルトと管
@@ -30,14 +30,14 @@ from gatling_overlap import overlaps
     {"flange.bolt_seat": 12, "flange.bolt_phase": 45, "band.bar.width": 10, "band.above_flange": 1},  # 10. ボルトの頭と腕
     {"lug.count": 30, "hoop.ear.count": 30},                                                          # 11. 個数の上限
     {"band.bar.width": 36}, {"band.above_flange": 23}, {"shell.plenum_height": 76},                   # 12. 胴バンドの耳とフレーム
-    {"lug.height": 50.6, "cradle.clearance": 21,                                                      # 13. 耳のボルトの頭とラグ
+    {"lug.body_dia": 50.6, "cradle.clearance": 31,                                                    # 13. 耳のボルトの頭とラグ
      "band.bar.width": 6, "band.above_flange": 31.1905},
     {"lug.rod_head_height": 8}, {"hoop.outer.od": 5},                                           # 14. 受金が内リングに溶接できない・管に届かない
     {"lug.rod_head_dia": 10.7}, {"lug.standoff": 11.5, "lug.rod_head_dia": 11.7},                       # 15. ロッドの頭と内リング・管
     {"lug.rod_length": 29.5},                                                                         # 16. ロッドがラグに届かない
     {"shell.plenum_height": 10},                                                                      # 17. フレームと外リング（管）
     {"lug.rod_length": 82},                                                                           # 18. ラグの下に出た軸と胴バンドの耳
-    {"lug.count": 24, "hoop.ear.count": 24, "cradle.clearance": 31, "cradle.bar.thickness": 40,       # 19. ラグの下に出た軸とクレードルの腕
+    {"lug.count": 24, "hoop.ear.count": 24, "lug.body_dia": 19.5, "cradle.clearance": 31, "cradle.bar.thickness": 40,       # 19. ラグの下に出た軸とクレードルの腕
      "mount.body_height": 15, "lug.rod_length": 69},
     {"lug.standoff": 9.5, "lug.rod_length": 76.5},                                                    # 20. 軸と胴バンド
     {"lug.count": 12, "hoop.ear.count": 12, "cradle.clearance": 13,                                  # 21. 軸とホルダー受け
@@ -46,26 +46,26 @@ from gatling_overlap import overlaps
      "lug.rod_length": 60.8},
     {"hoop.outer.od": 10, "mount.body_height": 48.3},                                                 # 23. ホルダー受けと受金
     {"hoop.inner.thickness": 0.9, "lug.standoff": 6, "lug.rod_head_dia": 7},                                                                 # 24. 受金とフレッシュフープ（内リングが薄い）
-    {"lug.body_dia": 30, "lug.height": 50},                                                           # 25. 円筒の本体（ロッドの外側へ広がる）とフレーム・当て板
+    {"lug.depth": 23, "lug.body_dia": 35},                                                            # 25. 円盤の外側の面（胴の外面から厚みぶん）とフレーム
 ])
 def test_an_override_that_breaks_the_shape_is_fatal(values):
     assert fatal_count(issues(override(SPEC, **values))) >= 1, values
 
 
 @pytest.mark.parametrize("values", [
-    {"lug.count": 24, "hoop.ear.count": 24, "cradle.clearance": 31},                                  # 3・11 の内側
+    {"lug.count": 24, "hoop.ear.count": 24, "lug.body_dia": 19.5, "cradle.clearance": 31},                                  # 3・11 の内側
     {"cradle.handle_length": 31.2, "mount.body_height": 33.7},                                        # 8・9 の内側
     {"tube.gap_ratio": 0.19},                                                                         # 7 の内側
     {"flange.bolt_seat": 12, "flange.bolt_phase": 33, "band.bar.width": 10, "band.above_flange": 1},  # 10 の内側
     {"hoop.inner.thickness": 1.5, "hoop.seat": 1.5, "lug.standoff": 6, "lug.rod_head_dia": 7,         # 4・5 の内側
-     "lug.height": 50, "cradle.clearance": 10.5},
+     "lug.body_dia": 35, "lug.depth": 22},
     {"cradle.clearance": 21, "band.bar.width": 36},                                                   # 12 の内側
-    {"lug.height": 50.6, "cradle.clearance": 21,                                                      # 13 の内側
+    {"lug.body_dia": 50.6, "cradle.clearance": 31,                                                    # 13 の内側
      "band.bar.width": 6, "band.above_flange": 29.19},
     {"lug.rod_head_height": 7.9}, {"hoop.outer.od": 5.1},                                             # 14 の内側（内リングに 0.1 だけ溶接、管に 0.1 だけ届く）
     {"lug.rod_head_dia": 10.6, "lug.rod_length": 29.53},                                              # 15・16 の内側
     {"lug.rod_length": 76},                                                                           # 18 の内側（ラグの下に出るのは警告だけ）
-    {"lug.count": 24, "hoop.ear.count": 24, "cradle.clearance": 31, "cradle.bar.thickness": 40,       # 19 の内側
+    {"lug.count": 24, "hoop.ear.count": 24, "lug.body_dia": 19.5, "cradle.clearance": 31, "cradle.bar.thickness": 40,       # 19 の内側
      "mount.body_height": 15, "lug.rod_length": 68.5},
     {"lug.standoff": 9.5, "lug.rod_length": 76},                                                      # 20 の内側
     {"lug.count": 12, "hoop.ear.count": 12, "cradle.clearance": 13,                                  # 21 の内側
@@ -74,7 +74,7 @@ def test_an_override_that_breaks_the_shape_is_fatal(values):
      "lug.rod_length": 60.6},
     {"hoop.outer.od": 10, "mount.body_height": 48.1},                                                   # 23 の内側
     {"hoop.inner.thickness": 1.0, "lug.standoff": 6, "lug.rod_head_dia": 7},                                                                # 24 の内側（受金の内端がフレッシュフープの外面ちょうど）
-    {"lug.body_dia": 24, "lug.height": 50},                                                           # 25 の内側（本体の外端 98 = フレームの内面ちょうど）
+    {"lug.depth": 22, "lug.body_dia": 35},                                                            # 25 の内側（円盤の外側の面 98 = フレームの内面ちょうど）
 ])
 def test_an_override_just_inside_the_checks_builds_without_any_overlap(values):
     spec = override(SPEC, **values)

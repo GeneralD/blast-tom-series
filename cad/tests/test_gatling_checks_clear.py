@@ -18,19 +18,19 @@ def test_the_default_spec_has_nothing_in_the_way():
 
 @pytest.mark.parametrize("count", [4, 8, 12])
 def test_a_lug_under_the_holder_is_fatal(count):
-    """ラグ数 4・8・12 では −Y（270°）にラグが来て、ホルダー受け（中心 y −110.5、半径 20）にラグの本体（u 78〜94）が 3.5 食い込む。"""
+    """ラグ数 4・8・12 では −Y（270°）にラグが来て、ホルダー受け（中心 y −110.5、半径 20）にラグの円盤（外側の面 u 96）が 5.5 食い込む。"""
     found = _fatal(override(SPEC, lug__count=count, hoop__ear__count=count))
     assert any("ラグ" in w and "ホルダー受け" in w for w in found), found
 
 
 def test_a_lug_that_just_clears_the_holder_passes():
-    # 逃げ 18.5: ホルダー中心 y −114、内縁 −94 = ラグの本体の外端 −94（接するだけ）
-    assert not any("ホルダー受け" in w for w in _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=18.5)))
-    assert any("ホルダー受け" in w for w in _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=18.4)))
+    # 逃げ 20.5: ホルダー中心 y −116、内縁 −96 = ラグの円盤の外側の面 −96（接するだけ）
+    assert not any("ホルダー受け" in w for w in _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=20.5)))
+    assert any("ホルダー受け" in w for w in _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=20.4)))
 
 
 def test_a_lug_that_reaches_down_to_the_pad_is_fatal():
-    # ラグ 12 個。ラグ（z 63.79〜98.79）は当て板（z 60〜66）と z が重なり、270° のラグ（y −78〜−94 の本体）が当て板（y −86〜）に入る。
+    # ラグ 12 個。ラグ（z 64.79〜94.79）は当て板（z 60〜66）と z が重なり、270° のラグ（y −74〜−96 の円盤。当て板の帯では半幅 5.9）が当て板（y −80.5〜）に入る。
     # ホルダーは逃げ 21 で避けておく
     found = _fatal(override(SPEC, lug__count=12, hoop__ear__count=12, cradle__clearance=21))
     assert any("ラグ" in w and "当て板" in w for w in found), found
@@ -59,19 +59,20 @@ def test_a_grip_too_close_to_the_frame_runs_into_the_pad_and_the_holder():
 
 
 def test_a_lug_that_reaches_down_to_the_frame_and_sticks_out_of_it_is_fatal():
-    """ラグ高さ 50（下端 44.79）でフレーム（z 54〜60）と z が重なる。0° のラグの本体の外端（u 94）がフレーム内面 83 + 逃げ の外に出ると当たる。"""
-    tall = {"lug.height": 50}
+    """円盤の径 50（下端 44.79）でフレーム（z 54〜60）と z が重なる。0° のラグの外側の面（u = 76 + 20 = 96）が
+    フレーム内面 83 + 逃げ の外に出ると当たる（逃げ 13 でちょうど接する）。"""
+    tall = {"lug.body_dia": 50}
     assert any("ラグ" in w and "フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=8, **tall)))
-    assert any("ラグ" in w and "フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=10.9, **tall)))
-    assert not any("フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=11, **tall)))     # 本体の外端がちょうど内面に接する
+    assert any("ラグ" in w and "フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=12.9, **tall)))
+    assert not any("フレーム" in w for w in _fatal(override(SPEC, cradle__clearance=13, **tall)))     # 外側の面がちょうど内面に接する
 
 
 def test_a_lug_on_the_diagonal_that_reaches_down_to_an_arm_is_fatal():
     """腕はフレームの内側（対角線上、胴バンドの外面から隅まで）にある。フレームの平角材を厚くすると腕が胴バンドの上端より上に出て、
     45° のラグ（ラグ 8 個）の下端に届く。脚はフレームの内面より外にあるので、脚に届くラグはフレームの検査で先に止まる。"""
-    values = {"lug.count": 8, "hoop.ear.count": 8, "cradle.bar.thickness": 40, "lug.height": 60}
+    values = {"lug.count": 8, "hoop.ear.count": 8, "cradle.bar.thickness": 40, "lug.body_dia": 60}
     assert any("ラグ" in w and "腕" in w for w in _fatal(override(SPEC, **values)))
-    assert not any("腕" in w for w in _fatal(override(SPEC, **{**values, "lug.height": 43.2})))     # 下端 51.59 > 腕の上端 51.5
+    assert not any("腕" in w for w in _fatal(override(SPEC, **{**values, "lug.body_dia": 43.2})))     # 下端 51.59 > 腕の上端 51.5
 
 
 @pytest.mark.parametrize("values", [{"band.bar.width": 36}, {"band.above_flange": 23}, {"shell.plenum_height": 76}])
@@ -87,15 +88,15 @@ def test_a_band_tab_inside_the_frame_passes():
 
 
 def test_a_rod_that_runs_out_of_the_lug_down_to_a_band_tab_is_fatal():
-    """軸の先がラグの下端（59.79）より下に出るのは警告だが、さらに下の胴バンドの耳（0° と 180°、上端 44）に届けば干渉。
+    """軸の先がラグの下端（64.79）より下に出るのは警告だが、さらに下の胴バンドの耳（0° と 180°、上端 44）に届けば干渉。
     軸の先 = 受金の上面 120.19 − 長さ。長さ 76 で 44.19、82 で 38.19。"""
     assert any("ロッド" in w and "耳" in w for w in _fatal(override(SPEC, lug__rod_length=82)))
     assert not any("ロッド" in w for w in _fatal(override(SPEC, lug__rod_length=76)))
 
 
-# 軸の先（受金の上面 120.19 − 長さ）がラグの下端（59.79）より下に出る override。ロッドとラグの外の部品との干渉は、
+# 軸の先（受金の上面 120.19 − 長さ）がラグの下端（64.79。24 個の _ARM は円盤を細くして 75.29）より下に出る override。ロッドとラグの外の部品との干渉は、
 # それぞれの部品にだけ当たる値で、境界の 2 点（当たる・当たらない）を押さえる。
-_ARM = {"lug.count": 24, "hoop.ear.count": 24, "cradle.clearance": 31, "cradle.bar.thickness": 40, "mount.body_height": 15}
+_ARM = {"lug.count": 24, "hoop.ear.count": 24, "lug.body_dia": 19.5, "cradle.clearance": 31, "cradle.bar.thickness": 40, "mount.body_height": 15}
 _HOLDER = {"lug.count": 12, "hoop.ear.count": 12, "cradle.clearance": 13, "cradle.bar.thickness": 1, "cradle.pad.thickness": 1,
            "mount.body_height": 1}
 _FRAME = {"cradle.clearance": 5, "cradle.pad.depth": 40, "cradle.pad.width": 40, "cradle.bar.thickness": 5}
@@ -122,7 +123,7 @@ def test_a_rod_that_runs_down_to_a_body_band_is_fatal():
 
 def test_a_rod_that_runs_down_to_the_holder_seat_is_fatal():
     """ホルダー受け（z 58.5〜59.5。フレームの厚み 1 の上面 57.5 + 当て板厚 1 の上に高さ 1）に、270° のロッド（ラグ 12 個。管 6 本と
-    方位が揃う）が届く。ラグの下端 59.79 はホルダー受けの上端 59.5 より上なので、ロッドの軸だけが当たる（フレームを薄くして下げた）。
+    方位が揃う）が届く。ラグの下端 64.79 はホルダー受けの上端 59.5 より上なので、ロッドの軸だけが当たる（フレームを薄くして下げた）。
     長さ 60 で軸の先 60.19（ホルダー受けの上）、61 で 59.19（中）。"""
     assert _rod_hits(override(SPEC, **_HOLDER, lug__rod_length=61), "ホルダー受け")
     assert _fatal(override(SPEC, **_HOLDER, lug__rod_length=60)) == []
@@ -130,7 +131,7 @@ def test_a_rod_that_runs_down_to_the_holder_seat_is_fatal():
 
 def test_a_rod_that_runs_down_to_the_cradle_frame_is_fatal():
     """フレーム（厚み 5 で z 54.5〜59.5、内面 83 + 逃げ）に、0°・180° のロッド（中心半径 86、軸の半径 3 → 外側 89）が届く。逃げ 5 で内面 88 < 89。
-    ラグの下端 59.79 がフレームの上面 59.5 より上になるよう薄くしてある。長さ 60.6 で軸の先 59.59（フレームの上）、60.8 で 59.39（中）。
+    ラグの下端 64.79 がフレームの上面 59.5 より上になるよう薄くしてある。長さ 60.6 で軸の先 59.59（フレームの上）、60.8 で 59.39（中）。
     逃げ 6 なら内面 89 に収まる。"""
     assert _rod_hits(override(SPEC, **_FRAME, lug__rod_length=60.8), "フレーム")
     assert _fatal(override(SPEC, **_FRAME, lug__rod_length=60.6)) == []
@@ -144,14 +145,3 @@ def test_a_holder_seat_that_reaches_the_ear_beside_a_thin_tube_is_fatal():
     found = [w for w in _fatal(override(SPEC, hoop__outer__od=10, mount__body_height=48.3))]
     assert len(found) == 1 and "受金" in found[0] and "外半径 96.22" in found[0], found
     assert _fatal(override(SPEC, hoop__outer__od=10, mount__body_height=48.1)) == []
-
-
-@pytest.mark.parametrize("leaves", [
-    {"lug.body_dia": 25.153, "lug.foot_dia": 7.527, "cradle.clearance": 11.383},
-    {"lug.body_dia": 20, "cradle.clearance": 6, "lug.foot_dia": 8},
-    {"lug.body_dia": 22, "cradle.clearance": 8},
-])
-def test_a_round_lug_body_that_clears_the_pad_is_not_judged_by_its_circumscribed_square(leaves):
-    """本体は円柱。外接する正方形の角（最大 0.41 × 半径）で、当たっていない当て板を fatal にしない（実形状の lug と pad は離れている）。"""
-    found = _fatal(override(SPEC, **{k.replace(".", "__"): v for k, v in leaves.items()}))
-    assert not any("ラグ" in w and "当て板" in w for w in found), found

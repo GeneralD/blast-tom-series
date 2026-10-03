@@ -20,7 +20,7 @@ from .derived import derive
 from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_rod, lookup_screw
 from .interference import ear_clear, flange_bolts_removable, hoop_rings, mount_clear
 from .params import GatlingSpec
-from .placement import flange_bolt_points, levels, pipe_inner_radius, radii, tip_bolt_points, tube_points
+from .placement import flange_bolt_points, levels, lug_plan, pipe_inner_radius, radii, tip_bolt_points, tube_points
 from .planar import EPS, z_overlap
 
 MIN_ENGAGEMENT = 0.75         # ねじ込み長 / 呼び径の下限（下回ると警告）
@@ -33,7 +33,7 @@ _POSITIVE = (
     "edge.angle", "edge.radius", "edge.height", "edge.width",
     "hoop.inner.thickness", "hoop.inner.height", "hoop.outer.od", "hoop.outer.thickness", "hoop.gap",
     "hoop.seat", "hoop.takeup", "hoop.ear.width", "hoop.ear.thickness",
-    "lug.body_dia", "lug.foot_dia", "lug.height", "lug.standoff", "lug.hole_dia", "lug.rod_length", "lug.rod_head_dia", "lug.rod_head_height",
+    "lug.body_dia", "lug.depth", "lug.standoff", "lug.hole_dia", "lug.rod_length", "lug.rod_head_dia", "lug.rod_head_height",
     "tube.od", "tube.thickness", "tube.length",
     "clamp.tip_thickness", "clamp.mid_thickness", "clamp.bolt_length",
     "header.thickness", "flange.thickness", "flange.bolt_seat", "flange.bolt_length", "plate.margin", "gasket.thickness",
@@ -221,13 +221,14 @@ def spacing(spec: GatlingSpec) -> list[Issue]:
 
     幅 w の矩形を方位の線に沿って並べると、隣り合う 2 つは内側の端（半径 r0）の角で先に当たる。重ならない条件は
     w ≤ 2 × r0 × tan(180° / 個数)。ロッドの半径での弦長で比べると、内端の角の重なりを見落とす（内端はロッドより内側）。
-    受金の内端は内リングの外面（受金はリングの間に沈む）、ラグの内端は胴の外面。2 個以下は向かい合うので重ならない。
+    受金の内端は内リングの外面（受金はリングの間に沈む）、ラグは円盤の径が幅で、内端は円盤が胴の外面の円で切られる側縁の根元
+    （`lug_plan` の u0 = √(胴の半径² − (円盤の径 / 2)²)）。2 個以下は向かい合うので重ならない。
     """
     r = radii(spec)
     found = []
     for what, n, width, r0 in (
         ("受金", int(float(spec.hoop.ear.count)), float(spec.hoop.ear.width), r.hoop_in_outer),
-        ("ラグ", int(float(spec.lug.count)), 2 * float(spec.lug.standoff), r.shell),
+        ("ラグ", int(float(spec.lug.count)), float(spec.lug.body_dia), lug_plan(spec)[0]),
     ):
         if n >= 3:
             found += at_most(f"{what} {n} 個が隣どうしで重なる（幅 > 2 × 内端の半径 × tan(180° / 個数)）",
@@ -278,22 +279,25 @@ def ear_fits(spec: GatlingSpec) -> list[Issue]:
 
 
 def lug_fits(spec: GatlingSpec) -> list[Issue]:
-    """胴の取付穴（ラグ 1 個に 1 つ、ラグの高さの中心）が胴の高さと台座に収まり、台座がラグの高さに収まる。
-    ラグの本体にロッドの穴の肉が残り、台座に穴の肉が残る。ラグが胴バンドに重ならない。"""
+    """胴の取付穴（ラグ 1 個に 1 つ、円盤の中心の高さ）が胴の高さと円盤に収まる。ロッドの通る位置が円盤の厚みと幅に収まる。
+    ラグが胴バンドに重ならない。
+
+    ラグは胴の外から見て丸い円盤で、軸は半径方向（円盤の径 = ラグの高さ）。ロッドは円盤の上端から縦に入り、位置は胴の外面から
+    `standoff`。外縁（standoff + ロッドの半径）が円盤の厚み `depth` を超えると、ロッドが円盤の外側の面から出る（fatal）。
+    円盤の径がロッドの呼び径以下だと、ロッドの外縁が円盤の幅の外に出て穴の肉が残らない（fatal）。取付穴の径以下でも、
+    ねじの座が円盤に残らない（fatal）。
+    """
     z, s = levels(spec), spec.lug
     zc = (z.lug_top + z.lug_bottom) / 2
-    hole, foot = float(s.hole_dia) / 2, float(s.foot_dia) / 2
+    hole, bore = float(s.hole_dia) / 2, float(lookup_rod(s.thread))
     found = (at_least("ラグの取付穴が胴の下端（フランジ）にかかる", zc - hole, z.flange_top)
              + at_most("ラグの取付穴が胴の上端にかかる", zc + hole, z.shell_top)
-             # 台座の軸はラグの高さの中心にあり上下対称なので、下側だけ見れば上側も同じ
-             + at_least("ラグの台座がラグの高さから出る", zc - foot, z.lug_bottom)
-             + at_most("ラグの本体が胴の外面にかかり、胴の外面で切られる（本体の半径 > standoff）", float(s.body_dia) / 2, float(s.standoff), fatal=False)
+             + at_most("ロッドが円盤の厚みに収まらない（standoff + ロッドの半径 > depth）", float(s.standoff) + bore / 2, float(s.depth))
              + at_least("ラグが胴バンドに重なる（ラグ下端とバンド上端の距離）", z.lug_bottom, z.band_top))
-    bore = float(lookup_rod(s.thread))
     if float(s.body_dia) <= bore + EPS:
-        found.append(Issue(True, f"ラグの本体の径がロッドの穴径以下で、肉が残らない（{float(s.body_dia):.2f} ≤ {bore:.2f}）"))
-    if foot <= hole + EPS:
-        found.append(Issue(True, f"ラグの台座の径が胴の取付穴の径以下で、穴が台座に収まらない（{2 * foot:.2f} ≤ {2 * hole:.2f}）"))
+        found.append(Issue(True, f"ラグの円盤の径がロッドの穴径以下で、ロッドの外縁が円盤の幅の外に出る（{float(s.body_dia):.2f} ≤ {bore:.2f}）"))
+    if float(s.body_dia) <= float(s.hole_dia) + EPS:
+        found.append(Issue(True, f"ラグの円盤の径が胴の取付穴の径以下で、穴が円盤に収まらない（{float(s.body_dia):.2f} ≤ {float(s.hole_dia):.2f}）"))
     return found
 
 

@@ -26,16 +26,16 @@ def head(spec: GatlingSpec) -> cq.Workplane:
 
 
 def lug(spec: GatlingSpec) -> cq.Workplane:
-    """ラグ。ロッドと同軸の縦の円筒の本体（ロッドの穴が縦に通る）と、胴の外面から本体までの台座（胴にねじ 1 本で留める）を
-    1 つの solid にする。台座はラグの高さの中心を軸に胴の外面へ向かって伸び、胴の外面の円柱で切って、食い込まず離れず沿わせる。"""
+    """ラグ（タレット形）。胴の外から見て丸い円盤で、軸は胴の半径方向。円盤の中心を胴の内側から 1 本のねじで留める。
+    円盤は径 `body_dia`、胴の外面から外側の面まで `depth`、中心の高さはラグの高さ帯の中心（胴の取付穴の高さ）。
+    胴側は胴の外面の円柱で切って、食い込まず離れず沿わせる。ロッドの穴（呼び径）は円盤の上端から下端まで縦に通す
+    （ロッドの先の高さは `checks.rod_fits` が見る。穴が貫通なので、先がどこにあっても軸が円盤に食い込まない）。"""
     z, r, s = levels(spec), radii(spec), spec.lug
     zc = (z.lug_top + z.lug_bottom) / 2
-    body = cylinders([(r.rod, 0)], float(s.body_dia), z.lug_bottom, z.lug_top)
-    start = r.shell - float(s.foot_dia)                 # 胴の壁の中から始めて、下で胴の外面の円柱で切る（円弧に沿わせる）
-    foot = cylinder((start, 0, zc), (1, 0, 0), float(s.foot_dia), r.rod - start)
-    solid = body.union(foot).cut(cylinders([(r.rod, 0)], float(lookup_rod(s.thread)), z.lug_bottom, z.lug_top))
-    # 胴の外面より内側（台座の根元、胴にかかる本体）は胴の壁なので、胴の外面の円柱で切る
-    solid = solid.cut(cylinders([(0, 0)], 2 * r.shell, z.lug_bottom, z.lug_top))
+    # 軸の上の胴の中心から始めて外側の面まで伸ばし、胴の外面の円柱で切る（円弧に沿わせる。外側の面は胴の外面から depth の平面）
+    disc = cylinder((0, 0, zc), (1, 0, 0), float(s.body_dia), r.shell + float(s.depth))
+    bore = cylinders([(r.rod, 0)], float(lookup_rod(s.thread)), z.lug_bottom, z.lug_top)
+    solid = disc.cut(bore).cut(cylinders([(0, 0)], 2 * r.shell, z.lug_bottom - 1, z.lug_top + 1))   # 円盤の上下の接線を避けて 1 mm 広く
     return around_z(solid, lug_angles(spec))
 
 

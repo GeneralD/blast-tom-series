@@ -62,6 +62,7 @@ def test_fabricated_standards_and_dimensions_are_written_from_the_spec():
     assert info["hoop_outer"].dimensions == "φ25.4 × t1.5、内径 φ181.4（中心径 φ206.8）"
     assert info["ear"].dimensions == "20 × 22.7 × t6"                                  # 内リングの外面から管の中心まで
     assert info["rod"].dimensions == "L50（頭 φ9 × H5）"
+    assert info["lug"].dimensions == "φ30 × 厚み20"                                   # 胴の外から見た円盤の径 × 半径方向の厚み
     changed = {p.name: p for p in parts(override(SPEC, tube__length=500, tube__od=42.7, shell__plenum_height=90))}
     assert changed["tube"].dimensions == "φ42.7 × t1.2 × L530（組立後に L500 へ切り詰め）"
     assert changed["shell"].dimensions == "φ152 × t1.2 × H90"
@@ -69,7 +70,7 @@ def test_fabricated_standards_and_dimensions_are_written_from_the_spec():
 
 def test_the_standards_of_the_purchased_parts_follow_the_choices():
     info = {p.name: p for p in parts(SPEC)}
-    assert info["lug"].standard == "単穴の円筒ラグ（型番未定）" and info["rod"].standard == "テンションロッド #12-24"
+    assert info["lug"].standard == "単穴の丸形ラグ（型番未定）" and info["rod"].standard == "テンションロッド #12-24"
     assert info["holder"].standard == "L ロッド 12.7" and info["bolt_tip"].standard == "黒色 SUS 六角穴付きボルト M5"
     other = {p.name: p for p in parts(override(SPEC, mount__type="L ロッド 10.5"))}
     assert other["holder"].standard == "L ロッド 10.5"

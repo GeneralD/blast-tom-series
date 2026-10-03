@@ -109,7 +109,7 @@ def test_the_clamps_follow_the_tube_length_and_the_ratios():
 
 def test_the_lugs_stand_a_takeup_below_the_collar_and_inside_the_shell_height():
     z = levels(SPEC)
-    assert (z.lug_top, z.lug_bottom) == pytest.approx((94.7905, 59.7905))       # 管の下端 − 締め代 5
+    assert (z.lug_top, z.lug_bottom) == pytest.approx((94.7905, 64.7905))       # 管の下端 − 締め代 5。下端は上端 − 円盤の径 30
     assert min(z.collar_bottom, z.hoop_bottom) - z.lug_top == pytest.approx(5)   # 引き下ろす余地。ラグが止まりにならない
     assert z.flange_top < z.lug_bottom and z.lug_top < z.shell_top
     low = levels(override(SPEC, hoop__outer__od=38.1))                            # 管が太くなれば、ラグはその下
@@ -120,7 +120,7 @@ def test_the_lugs_stand_a_takeup_below_the_collar_and_inside_the_shell_height():
 
 def test_the_rod_path_from_the_ear_top_to_the_lug_bottom_adds_up_ear_pipe_takeup_and_lug():
     z = levels(SPEC)
-    assert z.ear_top - z.lug_bottom == pytest.approx(25.4 - 5 + 5 + 35)   # 60.4（管の外径 − 頭の高さ（受金の上面は管の上端より頭の高さだけ下）+ 締め代 + ラグ）
+    assert z.ear_top - z.lug_bottom == pytest.approx(25.4 - 5 + 5 + 30)   # 55.4（管の外径 − 頭の高さ（受金の上面は管の上端より頭の高さだけ下）+ 締め代 + 円盤の径）
 
 
 def test_the_band_sits_above_the_flange_and_the_frame_at_mid_plenum_height():
@@ -165,13 +165,22 @@ def test_a_lug_is_held_by_a_single_screw_at_the_middle_of_its_height():
     assert LUG_HOLE_SIDES == (0,) and LUG_HOLES == 1
 
 
-def test_the_lug_plan_is_the_foot_rectangle_and_the_body_circle():
-    """平面形（ラグの局所座標 u, v）。台座の矩形は、胴の外面の円で切られる側縁の根元（u = R − (R − √(R² − f²))）から
-    ロッドの中心まで、幅は台座の径。本体はロッドの中心の円（中心 u、半径 body_dia / 2）。形と同じ葉（standoff・foot_dia・body_dia）から作る。"""
-    foot, body = lug_plan(SPEC)
+def test_the_lug_plan_is_a_rectangle_from_the_shell_to_the_outer_face_of_the_disc():
+    """平面形（ラグの局所座標 u, v）。円盤は胴の外面から depth だけ半径方向に出た幅 body_dia の矩形。胴側は胴の外面の円で切られ、
+    側縁（v = ±b）では u = √(R² − b²) < R で触れるので、矩形の u0 はそこまで広げる。形と同じ葉（depth・body_dia）から作る。"""
     shell = 76.0
-    assert foot == pytest.approx((shell - (shell - math.sqrt(shell**2 - 6**2)), 86, -6, 6)) and foot[0] < shell
-    assert body == pytest.approx((86, 8))
-    foot, body = lug_plan(override(SPEC, lug__standoff=6, lug__body_dia=20, lug__foot_dia=10))
-    assert foot == pytest.approx((shell - (shell - math.sqrt(shell**2 - 5**2)), 82, -5, 5))
-    assert body == pytest.approx((82, 10))
+    assert lug_plan(SPEC) == pytest.approx((math.sqrt(shell**2 - 15**2), 96, -15, 15)) and lug_plan(SPEC)[0] < shell
+    assert lug_plan(override(SPEC, lug__depth=12, lug__body_dia=20)) == pytest.approx((math.sqrt(shell**2 - 10**2), 88, -10, 10))
+    assert lug_plan(override(SPEC, lug__standoff=15)) == pytest.approx(lug_plan(SPEC))      # ロッドの位置では動かない
+
+
+def test_the_lug_plan_narrows_to_the_slice_of_the_disc_inside_the_z_band():
+    """円盤は軸が半径方向の円柱なので、z の帯が円盤の中心の高さから離れるほど、その帯での平面形は細い（半幅 = √(b² − 中心からの距離²)）。
+    帯が円盤の中心の高さを含めば全幅。帯の中に円盤が無ければ呼ばない（呼び出し側が z の重なりを先に見る）。"""
+    z = levels(SPEC)
+    zc = (z.lug_top + z.lug_bottom) / 2
+    assert lug_plan(SPEC, zc - 1, zc + 1) == pytest.approx(lug_plan(SPEC))
+    half = math.sqrt(15**2 - 10**2)
+    u0, u1, v0, v1 = lug_plan(SPEC, z.lug_bottom - 5, zc - 10)                  # 帯の上端が中心の 10 下
+    assert (v0, v1) == pytest.approx((-half, half)) and u1 == 96 and u0 == pytest.approx(math.sqrt(76**2 - half**2))
+    assert lug_plan(SPEC, z.lug_top, z.lug_top + 5) == pytest.approx((76.0, 96, 0.0, 0.0), abs=1e-6)   # 上端の線

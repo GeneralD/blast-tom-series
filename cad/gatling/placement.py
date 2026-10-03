@@ -21,8 +21,8 @@ from .params import GatlingSpec
 BAND_SIDES = (1, -1)
 BAND_SPLIT = len(BAND_SIDES)      # 半環の数 = 分割面の端の数（耳の組・ボルト・ゴムシートの数）
 
-# ラグは胴にねじ 1 本で留める（D-21）。胴の取付穴はラグ 1 個につき、ラグの高さの中心に 1 つ。
-# 値は穴の位置のラグの高さの中心からの比（ラグの高さ × 値だけ上）。形は符号でループし、員数は `LUG_HOLES` で数える。
+# ラグは胴にねじ 1 本で留める（D-21）。胴の取付穴はラグ 1 個につき、ラグの高さ（= 円盤の径）の中心に 1 つ。
+# 値は穴の位置の円盤の中心からの比（円盤の径 × 値だけ上）。形は符号でループし、員数は `LUG_HOLES` で数える。
 LUG_HOLE_SIDES = (0,)
 LUG_HOLES = len(LUG_HOLE_SIDES)
 
@@ -124,7 +124,7 @@ def levels(spec: GatlingSpec) -> Levels:
         mid_top=mid_top, mid_bottom=mid_top - float(c.mid_thickness),
         tip_top=tip_bottom + float(c.tip_thickness), tip_bottom=tip_bottom, tube_tip=-length,
         pipe_centre=hoop_top - pipe / 2, hoop_bottom=hoop_bottom,
-        rod_top=ear_top + float(spec.lug.rod_head_height), rod_tip=ear_top - float(spec.lug.rod_length), lug_top=lug_top, lug_bottom=lug_top - float(spec.lug.height),
+        rod_top=ear_top + float(spec.lug.rod_head_height), rod_tip=ear_top - float(spec.lug.rod_length), lug_top=lug_top, lug_bottom=lug_top - float(spec.lug.body_dia),
         band_bottom=band_bottom, band_top=band_bottom + float(spec.band.bar.width),
         band_centre=band_bottom + float(spec.band.bar.width) / 2,
         frame_centre=frame_centre, frame_top=frame_top, pad_top=pad_top,
@@ -181,22 +181,28 @@ def pipe_inner_radius(spec: GatlingSpec, z0: float, z1: float) -> float:
     return r.hoop_out_centre - math.sqrt(half * half - d * d)
 
 
-def lug_plan(spec: GatlingSpec) -> tuple[tuple[float, float, float, float], tuple[float, float]]:
-    """ラグの平面形（ラグの局所座標）を、台座の矩形と本体の円で返す（干渉の検査用。形と同じ葉から作る）。
+def lug_plan(spec: GatlingSpec, z0: float | None = None, z1: float | None = None) -> tuple[float, float, float, float]:
+    """ラグの円盤の平面形（ラグの局所座標の矩形 (u0, u1, v0, v1)。干渉の検査用。形と同じ葉から作る）。
 
-    u は胴の中心からラグの方位へ、v はそれに直交（反時計回りが正）。返すのは (台座, 本体):
-    1. 台座 (u0, u1, v0, v1): 胴の外面からロッドの中心まで、幅は台座の径。台座は円柱を胴の外面の円で切るので、
-       側縁（v = ±f）では胴に u = √(R² − f²) < R で触れる。矩形の u0 はそこまで広げる（形から出る三日月を取りこぼさない）。
-    2. 本体 (u, 半径): ロッドの中心 (u = 胴の半径 + standoff, v = 0) の、本体の径の円。胴の外面にかかるぶんは
-       胴の外面で切られる（形も同じ）が、円は切らずに見る（保守側。かかる設定は `lug_fits` が警告する）。
+    u は胴の中心からラグの方位へ、v はそれに直交（反時計回りが正）。円盤は軸が u の円柱（半径 b = body_dia / 2、中心の高さ
+    `zc`）で、胴の外面から `depth` だけ外へ出る。外側の面は平面 u = 胴の半径 + depth。胴側は胴の外面の円柱で切られ、側縁
+    （v = ±半幅）では胴に u = √(R² − 半幅²) < R で触れる。矩形の u0 はそこまで広げる（形から出る三日月を取りこぼさない）。
+
+    `z0`, `z1` を渡すと、円盤のうちその z の帯に入る薄片だけの平面形になる。円盤は円柱なので、帯が `zc` から離れるほど細く、
+    半幅 = √(b² − 帯と zc の最短距離²)。帯が `zc` を含めば全幅 b。帯と円盤が重なることは呼び出し側が先に確かめる。
     方位 a のラグの平面座標は x = u cos a − v sin a、y = u sin a + v cos a（`lug_angles` の向き）。
     """
-    s = spec.lug
+    s, z = spec.lug, levels(spec)
     shell = float(derive(spec).shell_od) / 2
-    rod = shell + float(s.standoff)
-    foot, body = float(s.foot_dia) / 2, float(s.body_dia) / 2
-    root = math.sqrt(max(shell * shell - foot * foot, 0.0))
-    return (root, rod, -foot, foot), (rod, body)
+    b = float(s.body_dia) / 2
+    if z0 is None or z1 is None:
+        half = b
+    else:
+        zc = (z.lug_top + z.lug_bottom) / 2
+        lo, hi = max(z0, z.lug_bottom), min(z1, z.lug_top)
+        d = 0.0 if lo <= zc <= hi else min(abs(lo - zc), abs(hi - zc))
+        half = math.sqrt(max(b * b - d * d, 0.0))
+    return math.sqrt(max(shell * shell - half * half, 0.0)), shell + float(s.depth), -half, half
 
 
 def band_tab_length(spec: GatlingSpec) -> float:

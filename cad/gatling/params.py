@@ -73,9 +73,8 @@ class Hoop:
 @dataclass(frozen=True)
 class Lug:
     model: Choice
-    body_dia: Dim            # ラグの本体（ロッドと同軸の縦の円筒）の径。ロッドの穴が縦に通る
-    foot_dia: Dim            # 台座（胴の外面から本体まで、ねじの軸方向に伸びる短い円柱）の径。胴にねじ 1 本で留める
-    height: Dim              # 本体の高さ。台座の軸と胴の取付穴は、この高さの中心
+    body_dia: Dim            # 円盤（胴の外から見て丸いタレット形のラグ。軸は胴の半径方向）の径 = ラグの高さ。胴の取付穴はその中心
+    depth: Dim               # 円盤の厚み（半径方向。胴の外面から外側の面まで）。胴の内側から 1 本のねじで中心を留める
     thread: Choice           # テンションロッドのねじ
     count: Dim
     standoff: Dim            # 胴外面からロッド中心まで
@@ -218,10 +217,9 @@ SPEC = GatlingSpec(
                 hole_clearance=design(1.0, "ロッド通し穴の逃げ")),
     ),
     lug=Lug(
-        model=Choice("単穴の円筒ラグ（型番未定）", Source.PROVISIONAL, "実物 1 セットを測るまで。メーカーは固定しない（D-21）"),
-        body_dia=provisional(16, _REAL),
-        foot_dia=provisional(12, _REAL),
-        height=provisional(35, _REAL),
+        model=Choice("単穴の丸形ラグ（型番未定）", Source.PROVISIONAL, "実物 1 セットを測るまで。メーカーは固定しない（D-21）"),
+        body_dia=provisional(30, _REAL),
+        depth=provisional(20, _REAL),
         thread=Choice("#12-24", Source.PROVISIONAL, _REAL),
         count=design(6, "管の本数と方位を揃える"),
         standoff=provisional(10, _REAL),

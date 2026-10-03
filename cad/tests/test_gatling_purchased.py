@@ -28,32 +28,46 @@ def test_the_film_rests_on_the_bearing_edge_and_the_collar_hangs_outside_the_she
     assert not _inside(h, 76.1, 0, 112)                                         # 環の内面（r 76.2）と胴の外面（r 76）の間は空き
 
 
-def test_six_cylinder_lugs_stand_outside_the_shell_each_with_a_foot_to_the_shell_and_a_bore_for_the_rod():
+def test_six_turret_lugs_are_discs_on_the_shell_each_with_a_vertical_bore_for_the_rod():
+    """円盤の軸は半径方向（胴の外から見て丸い）。胴側は胴の外面（r 76）で止まり、外側の面は胴の外面から depth 20（x = 96）。
+    ロッドの穴（φ5.5）は円盤の上端から下端まで縦に通る（ロッドの先の高さによらず、軸が円盤に食い込まない）。"""
     part = lug(SPEC)
     box = _box(part)
-    zc = (59.7905 + 94.7905) / 2                                                 # ラグの高さの中心（胴の取付穴の高さ）
-    assert part.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((59.7905, 94.7905))
-    assert _inside(part, 86 + 5, 0, 80) and not _inside(part, 86 + 8.5, 0, 80)    # 本体は φ16（r 8）の縦の円筒
-    assert not _inside(part, 86 + 2, 0, 80) and _inside(part, 86 + 3, 0, 80)      # ロッドの穴は φ5.5（r 2.75）
-    assert _inside(part, 77, 0, zc + 5) and not _inside(part, 77, 0, zc + 7)      # 台座は φ12（r 6）で、ラグの高さの中心に軸がある
-    assert _inside(part, 77, 5.5, zc) and not _inside(part, 77, 6.5, zc)
-    assert not _inside(part, 75.9, 0, zc) and _inside(part, 76.1, 0, zc)          # 台座の胴側は胴の外面（r 76）で止まる
-    assert not _inside(part, 75.8, 5, zc)                                          # 横にずれても胴に食い込まない（円で沿う）
-    body = math.pi * (8**2 - 2.75**2) * 35
-    assert body < part.solids().vals()[0].Volume() < body + math.pi * 6**2 * 10    # 本体 + 台座。台座は本体の中を数えない
+    zc = (64.7905 + 94.7905) / 2                                                 # 円盤の中心の高さ（胴の取付穴の高さ）
+    assert part.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((64.7905, 94.7905))
+    assert _inside(part, 90, 14, zc) and not _inside(part, 90, 15.5, zc)          # 円盤は φ30（r 15）
+    assert _inside(part, 90, 0, zc + 14) and not _inside(part, 90, 0, zc + 15.5)
+    assert _inside(part, 95.9, 0, zc) and not _inside(part, 96.1, 0, zc)          # 外側の面は胴の外面から 20（平面）
+    assert _inside(part, 95.9, 14, zc) and not _inside(part, 96.1, 14, zc)        # 平面なので、縁でも同じ x
+    assert not _inside(part, 75.9, 0, zc) and _inside(part, 76.1, 0, zc)          # 胴側は胴の外面で止まる
+    assert not _inside(part, 75.8, 5, zc) and _inside(part, 76.3, 5, zc)          # 横にずれても胴に食い込まない（円で沿う）
+    assert not _inside(part, 86 + 2, 0, zc) and _inside(part, 86 + 3, 0, zc)      # ロッドの穴は φ5.5（r 2.75）
+    assert not _inside(part, 86, 0, zc + 10) and not _inside(part, 86, 0, zc - 10)   # 穴は円盤の上端から下端まで通る
+    assert _inside(part, 90, 0, zc + 10) and _inside(part, 90, 0, zc - 10)
+    disc = math.pi * 15**2 * 20
+    assert disc - math.pi * 2.75**2 * 30 < part.solids().vals()[0].Volume() < disc + 1000   # 円盤 + 胴の外面の円弧から出る三日月
 
 
-def test_the_lug_is_one_solid_per_lug_even_when_the_body_reaches_the_shell():
-    """本体が胴の外面にかかる（standoff が本体の半径より小さい）ときも、胴の外面で切って食い込まない。1 個 1 solid のまま。"""
-    part = lug(override(SPEC, lug__standoff=5))
-    assert part.solids().size() == 6
-    assert not _inside(part, 75.9, 0, 80)                                          # 切らなければ本体（x 73〜89）が胴に入る
+def test_the_lugs_stand_round_about_the_shell_at_the_lug_angles():
+    part = lug(SPEC)
+    zc = (64.7905 + 94.7905) / 2
+    for k in range(6):
+        a = math.radians(60 * k)
+        assert _inside(part, 90 * math.cos(a), 90 * math.sin(a), zc), k
+        assert not _inside(part, 90 * math.cos(a + math.radians(30)), 90 * math.sin(a + math.radians(30)), zc), k
 
 
-def test_the_foot_follows_its_diameter():
-    thick = lug(override(SPEC, lug__foot_dia=14))
-    zc = (59.7905 + 94.7905) / 2
-    assert _inside(thick, 77, 0, zc + 6.5) and not _inside(thick, 77, 0, zc + 7.5)
+def test_the_lug_is_one_solid_per_lug_even_when_the_rod_sits_near_the_disc_edge():
+    part = lug(override(SPEC, lug__standoff=15))
+    assert part.solids().size() == 6 and _inside(part, 91 + 3, 0, 80) and not _inside(part, 91 + 2, 0, 80)
+
+
+def test_the_disc_follows_its_diameter_and_depth():
+    thick = lug(override(SPEC, lug__depth=30, lug__body_dia=24))
+    zc = 94.7905 - 12
+    assert _box(thick).zmin == pytest.approx(94.7905 - 24)                       # 上端は変わらず、下端は径ぶん
+    assert _inside(thick, 105.9, 0, zc) and not _inside(thick, 106.1, 0, zc)
+    assert _inside(thick, 90, 0, zc + 11.5) and not _inside(thick, 90, 0, zc + 12.5)
 
 
 def test_six_tension_rods_hang_from_the_ear_top_with_the_head_on_the_ear():
