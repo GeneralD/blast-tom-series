@@ -56,11 +56,6 @@ def origin_distance(poly: list[Point]) -> float:
     return 0.0 if circle_overlaps((0.0, 0.0), 0.0, poly) else min(segment_distance((0.0, 0.0), a, b) for a, b in edges(poly))
 
 
-def square_reach(polys: list[list[Point]]) -> float:
-    """多角形の頂点の max(|x|, |y|) の最大。原点を中心とする正方形（クレードルのフレームの内面）から出るかを見る。"""
-    return max(max(abs(x), abs(y)) for poly in polys for x, y in poly)
-
-
 def z_overlap(a0: float, a1: float, b0: float, b1: float) -> bool:
     """2 つの z の区間が EPS を超えて重なる。"""
     return min(a1, b1) - max(a0, b0) > EPS
