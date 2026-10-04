@@ -30,14 +30,14 @@ def test_a_count_must_be_an_integer_and_large_enough(path, value, fragment):
 
 
 @pytest.mark.parametrize("path, value", [
-    ("flange.bolt", "M99"), ("clamp.bolt", "M3"), ("band.bolt", "M8"), ("lug.thread", "1/4-20"), ("mount.type", "L ロッド 9"),
+    ("flange.bolt", "M99"), ("clamp.bolt", "M3"), ("lug.thread", "1/4-20"), ("mount.type", "L ロッド 9"),
 ])
 def test_a_choice_that_is_not_in_the_standard_table_is_fatal(path, value):
     found = _fatal(override(SPEC, **{path: value}))
     assert any(path in w and "規格表" in w for w in found), found
 
 
-@pytest.mark.parametrize("path", ["tube.od", "tube.length", "shell.plenum_height", "header.thickness", "cradle.bar.width", "head.fit_id",
+@pytest.mark.parametrize("path", ["tube.od", "tube.length", "shell.plenum_height", "header.thickness", "pad.width", "head.fit_id",
                                   "hoop.outer.od", "hoop.outer.thickness", "lug.rod_head_dia", "lug.rod_head_height",
                                   "lug.body_dia", "lug.depth"])
 def test_a_dimension_that_is_zero_or_negative_is_fatal(path):
@@ -46,7 +46,7 @@ def test_a_dimension_that_is_zero_or_negative_is_fatal(path):
 
 
 def test_a_clearance_may_be_zero_but_not_negative():
-    assert _fatal(override(SPEC, header__hole_clearance=0, band__rubber=0, band__above_flange=0)) == []
+    assert _fatal(override(SPEC, header__hole_clearance=0)) == []
     assert any("header.hole_clearance" in w for w in _fatal(override(SPEC, header__hole_clearance=-0.1)))
 
 

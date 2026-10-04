@@ -30,7 +30,7 @@ _NOT_SHAPE = {"head.f01_range[0]", "head.f01_range[1]", "head.loss_factor"}
 _COUNTS = {"tube.count", "lug.count", "hoop.ear.count", "flange.bolt_count"}
 _NUMERIC = [path for path, leaf in walk(SPEC)
             if not isinstance(leaf, Choice) and path not in _NOT_SHAPE and path not in _COUNTS]
-_CHOICES = {"flange.bolt": SCREWS, "clamp.bolt": SCREWS, "band.bolt": SCREWS, "lug.thread": ROD_THREADS, "mount.type": HOLDER_RODS}
+_CHOICES = {"flange.bolt": SCREWS, "clamp.bolt": SCREWS, "lug.thread": ROD_THREADS, "mount.type": HOLDER_RODS}
 
 
 def random_override(rng: random.Random) -> dict[str, object]:

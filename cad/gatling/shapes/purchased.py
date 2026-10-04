@@ -9,8 +9,7 @@ import cadquery as cq
 
 from ..fasteners import lookup_holder, lookup_rod, lookup_screw
 from ..params import GatlingSpec
-from ..placement import (BAND_SIDES, band_bolt_x, cradle_y_rear, flange_bolt_points, levels, lug_angles, radii,
-                         tip_bolt_points)
+from ..placement import KNOB_EMBED, flange_bolt_points, holder_centre, levels, lug_angles, radii, tip_bolt_points
 from .common import around_z, compound, cylinder, cylinders, disc, ring
 
 
@@ -49,12 +48,15 @@ def rod(spec: GatlingSpec) -> cq.Workplane:
 
 
 def holder(spec: GatlingSpec) -> cq.Workplane:
-    """ホルダー受け（簡略）。当て板の上の円柱で、L ロッドが X 方向に通る穴がある。"""
+    """ホルダー受け（簡略）。ブロックの上の円柱で、L ロッドが X 方向に通る穴がある。締めるつまみは後ろ（−Y）へ水平に出す
+    （本体の中ほどの高さの円柱。形は簡単にして、本体の外面から `KNOB_EMBED` 食い込ませて 1 つにつなぐ）。"""
     z, m = levels(spec), spec.mount
-    y = cradle_y_rear(spec)
-    body = cylinders([(0, y)], float(m.body_dia), z.holder_bottom, z.holder_top)
-    bore = cylinder((-float(m.body_dia), y, (z.holder_bottom + z.holder_top) / 2), (1, 0, 0), float(lookup_holder(m.type)), 2 * float(m.body_dia))
-    return body.cut(bore)
+    x, y = holder_centre(spec)
+    body = cylinders([(x, y)], float(m.body_dia), z.holder_bottom, z.holder_top)
+    bore = cylinder((-float(m.body_dia), y, z.knob_centre), (1, 0, 0), float(lookup_holder(m.type)), 2 * float(m.body_dia))
+    rim = y - float(m.body_dia) / 2
+    knob = cylinder((x, rim + KNOB_EMBED, z.knob_centre), (0, -1, 0), float(m.knob_dia), float(m.knob_length) + KNOB_EMBED)
+    return body.cut(bore).union(knob)
 
 
 def _screw(head_dia: float, head_h: float, shank: float, length: float,
@@ -76,11 +78,3 @@ def bolt_tip(spec: GatlingSpec) -> cq.Workplane:
     s, z = lookup_screw(spec.clamp.bolt), levels(spec)
     return compound([_screw(float(s.head_dia), float(s.head_height), float(s.major), float(spec.clamp.bolt_length),
                             (x, y, z.tip_bottom), (0, 0, 1)) for x, y in tip_bolt_points(spec)])
-
-
-def bolt_band(spec: GatlingSpec) -> cq.Workplane:
-    """胴バンドの M6。+Y 側の耳の外面（y = gap/2 + 耳の厚み）に頭が座り、−Y 向きに締め代を渡って −Y 側の耳にねじ込む。"""
-    s, z = lookup_screw(spec.band.bolt), levels(spec)
-    zc, top = z.band_centre, float(spec.band.gap) / 2 + float(spec.band.bar.thickness)
-    return compound([_screw(float(s.head_dia), float(s.head_height), float(s.major), float(spec.band.bolt_length),
-                            (side * band_bolt_x(spec), top, zc), (0, -1, 0)) for side in BAND_SIDES])

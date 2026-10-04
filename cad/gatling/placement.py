@@ -15,11 +15,12 @@ from dataclasses import dataclass
 from .derived import MIL, derive
 from .fasteners import lookup_screw
 from .params import GatlingSpec
+from .planar import Point, rect
+from .tubepath import Path, Vec, fillet, plan_polygons, tangent_length, turn_angle
 
-# 胴バンドは 2 分割で固定する（分割数は SPEC の葉にしない）。分割面は XZ 面（y = 0）の 1 枚で、半環は +Y 側と
-# −Y 側、分割面の両端（+X 側と −X 側）に耳とボルトが付く。形はこの符号でループし、員数は `BAND_SPLIT` で数える。
-BAND_SIDES = (1, -1)
-BAND_SPLIT = len(BAND_SIDES)      # 半環の数 = 分割面の端の数（耳の組・ボルト・ゴムシートの数）
+# 当て板とスペードグリップは左右 1 枚（本）ずつ（D-22）。+X 側と −X 側の符号でループし、員数は `PAD_COUNT` で数える。
+PAD_SIDES = (1, -1)
+PAD_COUNT = len(PAD_SIDES)        # 当て板の枚数 = スペードグリップの本数（左右対称）
 
 # ラグは胴にねじ 1 本で留める（D-21）。胴の取付穴はラグ 1 個につき、ラグの高さ（= 円盤の径）の中心に 1 つ。
 # 値は穴の位置の円盤の中心からの比（円盤の径 × 値だけ上）。形は符号でループし、員数は `LUG_HOLES` で数える。
@@ -61,7 +62,7 @@ class Levels:
 
     前半（`hoop_top` 〜 `tube_tip`）は軸の上に積む部品の高さで、上から順（フープ → 受金 → ヘッド → エッジ → 胴 →
     フランジ → ガスケット → ヘッダープレート → 管とクランプ）。後半（`pipe_centre` 以降）は外リングの管・フープの
-    下端・テンションロッドと、胴の脇に付く部品（ラグ・胴バンド・クレードル・当て板・ホルダー受け）の高さで、
+    下端・テンションロッドと、胴の脇に付く部品（ラグ・当て板・腕・ホルダー受け）の高さで、
     上下の順には並べていない。
     """
 
@@ -86,15 +87,15 @@ class Levels:
     rod_tip: float            # テンションロッドの軸の先（受金の上面から rod_length 下）
     lug_top: float
     lug_bottom: float
-    band_bottom: float
-    band_top: float
-    band_centre: float        # 胴バンドの高さの中心（耳のボルト、クレードルの脚の下端と腕の厚みの中心）
-    frame_centre: float       # クレードルの水平フレームの厚みの中心
-    frame_top: float          # フレームの上面（= 当て板の下面）
-    pad_top: float            # 当て板の上面（= ホルダー受けの下面）
+    arm_centre: float         # 腕の管の中心の高さ。当て板の高さの中心も同じ（プレナム胴の中ほど）
+    arm_bottom: float
+    arm_top: float
+    pad_bottom: float
+    pad_top: float
+    block_top: float          # ブロックの上面（= 管の中心 + ブロックの高さ。ホルダー受けの下面）
     holder_bottom: float
     holder_top: float
-
+    knob_centre: float        # つまみの軸の高さ（ホルダー受けの高さの中心）
 
 def levels(spec: GatlingSpec) -> Levels:
     t, c = spec.tube, spec.clamp
@@ -114,10 +115,10 @@ def levels(spec: GatlingSpec) -> Levels:
     lug_top = min(collar_bottom, hoop_bottom) - float(spec.hoop.takeup)
     mid_top = -float(c.mid_position) * length
     tip_bottom = -length + float(t.protrusion_ratio) * float(t.od)
-    band_bottom = flange_top + float(spec.band.above_flange)
-    frame_centre = flange_top + float(spec.shell.plenum_height) / 2
-    frame_top = frame_centre + float(spec.cradle.bar.thickness) / 2
-    pad_top = frame_top + float(spec.cradle.pad.thickness)
+    arm_centre = flange_top + float(spec.shell.plenum_height) / 2
+    arm_r = float(spec.arm.pipe.od) / 2
+    block_top = arm_centre + float(spec.block.height)
+    holder_top = block_top + float(spec.mount.body_height)
     return Levels(
         hoop_top=hoop_top, ear_top=ear_top, ear_bottom=ear_bottom, head_top=head_top, edge_top=edge_top, collar_bottom=collar_bottom, shell_top=shell_top, flange_top=flange_top,
         gasket_top=gasket_top, header_bottom=-float(spec.header.thickness),
@@ -125,10 +126,9 @@ def levels(spec: GatlingSpec) -> Levels:
         tip_top=tip_bottom + float(c.tip_thickness), tip_bottom=tip_bottom, tube_tip=-length,
         pipe_centre=hoop_top - pipe / 2, hoop_bottom=hoop_bottom,
         rod_top=ear_top + float(spec.lug.rod_head_height), rod_tip=ear_top - float(spec.lug.rod_length), lug_top=lug_top, lug_bottom=lug_top - float(spec.lug.body_dia),
-        band_bottom=band_bottom, band_top=band_bottom + float(spec.band.bar.width),
-        band_centre=band_bottom + float(spec.band.bar.width) / 2,
-        frame_centre=frame_centre, frame_top=frame_top, pad_top=pad_top,
-        holder_bottom=pad_top, holder_top=pad_top + float(spec.mount.body_height),
+        arm_centre=arm_centre, arm_bottom=arm_centre - arm_r, arm_top=arm_centre + arm_r,
+        pad_bottom=arm_centre - float(spec.pad.height) / 2, pad_top=arm_centre + float(spec.pad.height) / 2,
+        block_top=block_top, holder_bottom=block_top, holder_top=holder_top, knob_centre=(block_top + holder_top) / 2,
     )
 
 
@@ -144,9 +144,7 @@ class Radii:
     hoop_out_inner: float     # 外リングの管の内側の接線（管の中心の高さで最も軸に近い所）
     hoop_out_centre: float    # 外リングの管の中心（= 受金の外端）
     hoop_out_outer: float     # 外リングの管の外面
-    band_inner: float
-    band_outer: float
-    frame_inner: float        # クレードルのフレーム内面（正方形の半幅）
+    pad_outer: float          # 当て板の外面（= 腕の付け根の高さでの、腕の管の始まり）
 
 
 def radii(spec: GatlingSpec) -> Radii:
@@ -156,13 +154,11 @@ def radii(spec: GatlingSpec) -> Radii:
     hoop_in_outer = hoop_in_inner + float(spec.hoop.inner.thickness)
     hoop_out_inner = hoop_in_outer + float(spec.hoop.gap)
     pipe = float(spec.hoop.outer.od)
-    band_inner = shell + float(spec.band.rubber)
-    band_outer = band_inner + float(spec.band.bar.thickness)
     return Radii(
         shell=shell, collar=float(d.head_od) / 2, rod=shell + float(spec.lug.standoff),
         hoop_in_inner=hoop_in_inner, hoop_in_outer=hoop_in_outer,
         hoop_out_inner=hoop_out_inner, hoop_out_centre=hoop_out_inner + pipe / 2, hoop_out_outer=hoop_out_inner + pipe,
-        band_inner=band_inner, band_outer=band_outer, frame_inner=band_outer + float(spec.cradle.clearance),
+        pad_outer=shell + float(spec.pad.thickness),
     )
 
 
@@ -205,26 +201,138 @@ def lug_plan(spec: GatlingSpec, z0: float | None = None, z1: float | None = None
     return math.sqrt(max(shell * shell - half * half, 0.0)), shell + float(s.depth), -half, half
 
 
-def band_tab_length(spec: GatlingSpec) -> float:
-    """胴バンドの耳（締め付け部）の長さ。ボルトの頭が収まるよう、頭径の 2 倍にする。"""
-    return 2 * float(lookup_screw(spec.band.bolt).head_dia)
+def pad_angles(spec: GatlingSpec) -> list[float]:
+    """当て板の方位（度）。+X 側は ±X 軸から後ろ（−Y）へ `pad.angle` 回した向き、−X 側はその左右対称（Y 軸に対する鏡像）。"""
+    angle = float(spec.pad.angle)
+    return [(-angle) % 360.0, (180.0 + angle) % 360.0]
 
 
-def band_bolt_x(spec: GatlingSpec) -> float:
-    """胴バンドのボルトの X 位置（耳の中央、+X 側。−X 側は符号を反転）。"""
-    return radii(spec).band_outer + band_tab_length(spec) / 2
+def pad_plan(spec: GatlingSpec) -> tuple[float, float, float, float]:
+    """当て板の平面形（板の局所座標の矩形 (u0, u1, v0, v1)。干渉の検査用。形と同じ葉から作る）。
+
+    u は胴の中心から板の方位へ、v はそれに直交。形は幅 `width`（v）の矩形の柱を、胴の外面から板厚ぶんの円筒殻で切ったもの。
+    外側は半径 R + 板厚の円で切られる。胴側は胴の外面の円で切られ、側縁（v = ±半幅）では u = √(R² − 半幅²) < R で胴に触れる。
+    矩形の u0 はそこまで広げる（`lug_plan` と同じ。形から出る三日月を取りこぼさない）。
+    """
+    shell, half = radii(spec).shell, float(spec.pad.width) / 2
+    return math.sqrt(max(shell * shell - half * half, 0.0)), radii(spec).pad_outer, -half, half
 
 
-def cradle_y_rear(spec: GatlingSpec) -> float:
-    """クレードルの後側の横桟の中心の Y 位置（ヘッドの手前を +Y、後ろを −Y とする）。当て板とホルダー受けの中心もここ。"""
-    return -(radii(spec).frame_inner + float(spec.cradle.bar.width) / 2)
+def pad_polys(spec: GatlingSpec) -> list[list[Point]]:
+    """当て板（左右）の平面形。方位ごとに `pad_plan` の矩形を回した凸多角形。"""
+    return [rect(*pad_plan(spec), a) for a in pad_angles(spec)]
 
 
-def grip_y(spec: GatlingSpec) -> float:
-    """ハンドルのグリップ（X 方向の丸棒）の中心の Y 位置。フレームの外面から `handle_length` 後ろ。"""
-    return -(radii(spec).frame_inner + float(spec.cradle.bar.width)) - float(spec.cradle.handle_length)
+def arm_vertices(spec: GatlingSpec) -> list[Vec]:
+    """腕の中心線の折れ線の頂点（丸める前）。右の当て板の外面 → 右の最初の曲がり → 右の後ろの角 → 左の後ろの角 → 左の最初の曲がり
+    → 左の当て板の外面。
+
+    右の当て板は方位 −`pad.angle` の半径方向の線の上にあり、腕はその外面から半径方向に `stub` 進んだ頂点で後ろ（−Y）へ折れ、
+    `rear` の高さで横（−X）へ折れて左へ渡る。左は Y 軸に対する鏡像。
+    """
+    angle = math.radians(float(spec.pad.angle))
+    direction = (math.cos(angle), -math.sin(angle))
+    start, corner = radii(spec).pad_outer, radii(spec).pad_outer + float(spec.arm.stub)
+    first = (corner * direction[0], corner * direction[1])
+    right = [(start * direction[0], start * direction[1]), first, (first[0], -float(spec.arm.rear))]
+    return right + [(-x, y) for x, y in right[::-1]]
 
 
-def cradle_corner(spec: GatlingSpec) -> float:
-    """クレードルの脚（4 隅）の中心までの、胴の中心からの距離。腕はここから対角線に沿って胴バンドの外面まで伸びる。"""
-    return (radii(spec).frame_inner + float(spec.cradle.bar.width) / 2) * math.sqrt(2)
+def arm_path(spec: GatlingSpec) -> Path:
+    """腕の中心線の経路（直線・円弧・直線…。曲げ半径 `arm.bend_radius` で 4 か所を丸めたもの）。
+
+    添字は固定: 0 直線（右の当て板→最初の曲げ）、1 円弧（右の最初の曲げ）、2 直線（右の脚）、3 円弧（右の後ろの角）、
+    4 直線（横渡し）、5 円弧（左の後ろの角）、6 直線（左の脚）、7 円弧（左の最初の曲げ）、8 直線（左の当て板へ）。
+    """
+    return fillet(arm_vertices(spec), float(spec.arm.bend_radius))
+
+
+def arm_polys(spec: GatlingSpec) -> list[list[Point]]:
+    """腕（管）の平面形を覆う凸多角形。直線は厳密な矩形、曲げは細かく分けた四角形（`tubepath.plan_polygons`）。"""
+    return plan_polygons(arm_path(spec), float(spec.arm.pipe.od) / 2)
+
+
+@dataclass(frozen=True)
+class ArmBends:
+    """腕の曲げが脚に収まるかを見る長さ（mm）。負なら、その曲げの接点が隣の曲げか当て板の内側に入る。"""
+
+    stub_free: float          # 当て板の外面から最初の曲げの接点までの直線の長さ（= stub − 接線の長さ）
+    leg_free: float           # 後ろへの脚の直線の長さ（最初の曲げの接点から後ろの角の接点まで）
+    cross_half: float         # 横渡しの直線部の長さの半分（中央から後ろの角の接点まで）
+
+
+def arm_bends(spec: GatlingSpec) -> ArmBends:
+    v, rb = arm_vertices(spec), float(spec.arm.bend_radius)
+    first = tangent_length(turn_angle(v[0], v[1], v[2]), rb)
+    corner = tangent_length(turn_angle(v[1], v[2], v[3]), rb)
+    return ArmBends(stub_free=math.dist(v[0], v[1]) - first, leg_free=math.dist(v[1], v[2]) - first - corner,
+                    cross_half=abs(v[2][0]) - corner)
+
+
+def holder_centre(spec: GatlingSpec) -> Point:
+    """ホルダー受け・ブロックの中心（平面）。後ろの横渡しの中央。"""
+    return 0.0, -float(spec.arm.rear)
+
+
+def block_plan(spec: GatlingSpec) -> list[Point]:
+    """ブロックの平面形（矩形）。"""
+    b, y = spec.block, holder_centre(spec)[1]
+    return rect(-float(b.width) / 2, float(b.width) / 2, y - float(b.depth) / 2, y + float(b.depth) / 2)
+
+
+def knob_plan(spec: GatlingSpec) -> list[Point]:
+    """つまみ（ホルダー受けの後ろへ水平に出る円柱）の平面形。本体の外面から 1 mm 食い込ませて（形は 1 つにつなぐ）、`knob_length` 出す。"""
+    m, y = spec.mount, holder_centre(spec)[1]
+    rim = y - float(m.body_dia) / 2
+    half = float(m.knob_dia) / 2
+    return rect(-half, half, rim - float(m.knob_length), rim + KNOB_EMBED)
+
+
+KNOB_EMBED = 1.0                  # つまみが本体の中へ入る長さ（mm）
+
+
+@dataclass(frozen=True)
+class GripPose:
+    """スペードグリップ 1 本の置き方。管の中心線は `start` から `direction`（単位ベクトル）へ `length` 伸び、その先に端板が `cap` の厚みで続く。"""
+
+    side: int                              # +1 が +X 側
+    start: tuple[float, float, float]
+    direction: tuple[float, float, float]
+    length: float
+    cap: float
+
+
+def grip_poses(spec: GatlingSpec) -> list[GripPose]:
+    """左右のスペードグリップ。付け根は後ろの角の円弧の中央（中心線の上）で、高さは腕の中心。
+
+    向きは後ろ（−Y）を基準に、外（その側の X 方向）へ `grip.out`、下へ `grip.drop` 傾けた単位ベクトル。
+    """
+    g, z = spec.grip, levels(spec).arm_centre
+    out, drop = math.radians(float(g.out)), math.radians(float(g.drop))
+    path = arm_path(spec)
+    poses = []
+    for side, arc in zip(PAD_SIDES, (path[3], path[5])):
+        x, y = arc.point(0.5)
+        poses.append(GripPose(side, (x, y, z),
+                              (side * math.sin(out) * math.cos(drop), -math.cos(out) * math.cos(drop), -math.sin(drop)),
+                              float(g.length), float(g.cap)))
+    return poses
+
+
+def grip_polys(spec: GatlingSpec) -> list[list[Point]]:
+    """スペードグリップ（端板を含む）の平面形。管の傾きで端の円が楕円に見えるぶん、前後に管の半径ずつ広げた矩形（見落とさない側）。"""
+    r = float(spec.arm.pipe.od) / 2
+    polys = []
+    for pose in grip_poses(spec):
+        horizontal = math.hypot(pose.direction[0], pose.direction[1])
+        angle = math.degrees(math.atan2(pose.direction[1], pose.direction[0]))
+        reach = (pose.length + pose.cap) * horizontal
+        polys.append([(pose.start[0] + x, pose.start[1] + y) for x, y in rect(-r, reach + r, -r, r, angle)])
+    return polys
+
+
+def grip_z(spec: GatlingSpec) -> tuple[float, float]:
+    """スペードグリップの z の範囲。上は付け根の管の上端、下は端板の中心から管の半径ぶん下（見落とさない側）。"""
+    r, pose = float(spec.arm.pipe.od) / 2, grip_poses(spec)[0]
+    end = pose.start[2] + (pose.length + pose.cap) * pose.direction[2]
+    return min(end, pose.start[2]) - r, pose.start[2] + r

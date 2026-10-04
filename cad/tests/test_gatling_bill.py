@@ -24,8 +24,8 @@ def test_no_fabricated_part_is_in_the_purchased_rows():
 def test_the_parts_without_a_shape_are_counted_from_the_spec():
     rows = {r.name: r for r in bom(SPEC)}
     assert rows["ラグボルト"].count == 6 and rows["シール座金"].count == 6              # ラグ 6 個 × 1（1 点留め）
-    assert rows["ゴムシート"].count == 2 and rows["ゴムシート"].dimensions == "t1" and rows["焼き付き防止剤"].count == 1
-    assert rows["ボルト M6（クレードルの腕）"].count == 4                              # 腕は溶接せずボルトで留める
+    assert rows["焼き付き防止剤"].count == 1
+    assert not [n for n in rows if "胴バンド" in n or "クレードル" in n or "ゴム" in n]   # D-22: 腕は当て板に溶接する。バンド・ゴム・腕のボルトは無い
     fewer = {r.name: r for r in bom(override(SPEC, lug__count=3, hoop__ear__count=3))}
     assert fewer["ラグボルト"].count == 3 and fewer["シール座金"].count == 3 and fewer["ラグ"].count == 3 and fewer["テンションロッド"].count == 3
 

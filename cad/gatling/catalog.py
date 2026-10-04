@@ -8,7 +8,8 @@ from drumcad.stock import nearest
 
 from .derived import derive
 from .params import GatlingSpec
-from .placement import BAND_SPLIT, radii
+from .placement import PAD_COUNT, radii
+from .strength import root_load
 
 SILICONE = Material("シリコーンゴム", 1.2e-3)                       # g/mm³（概算。ガスケットの質量用）
 PURCHASED = Material("既製品（材質は実物で確認）", 0.0)               # 既製品の質量は部品表に載せない
@@ -29,6 +30,8 @@ def parts(spec: GatlingSpec) -> list[PartInfo]:
     stock, _ = nearest(float(t.od), float(t.thickness))
     pipe = spec.hoop.outer
     hoop_stock, _ = nearest(float(pipe.od), float(pipe.thickness))
+    arm_stock, _ = nearest(float(spec.arm.pipe.od), float(spec.arm.pipe.thickness))
+    load = root_load(spec)
     n_tube, n_lug = int(float(t.count)), int(float(spec.lug.count))
     n_bolt = int(float(spec.flange.bolt_count))
     sheet = "SUS304 板"
@@ -58,15 +61,19 @@ def parts(spec: GatlingSpec) -> list[PartInfo]:
             f"φ{fmt(spec.lug.body_dia)} × 厚み{fmt(spec.lug.depth)}"),
         buy("rod", "テンションロッド", "#8b93a0", n_lug, (0, 0, 0.3), f"テンションロッド {spec.lug.thread.value}",
             f"L{fmt(spec.lug.rod_length)}（頭 φ{fmt(spec.lug.rod_head_dia)} × H{fmt(spec.lug.rod_head_height)}）"),
-        fab("band", "胴バンド", "#b6bcc6", BAND_SPLIT, "none", (0, 0, 0), f"{bar} {fmt(spec.band.bar.width)} × {fmt(spec.band.bar.thickness)}（{BAND_SPLIT} 分割）",
-            f"内径 φ{fmt(2 * r.band_inner)}"),
-        buy("bolt_band", f"ボルト {spec.band.bolt.value}（胴バンド）", "#3a3f47", BAND_SPLIT, (0, 0.6, 0),
-            f"六角穴付きボルト {spec.band.bolt.value}", f"L{fmt(spec.band.bolt_length)}"),
-        fab("cradle", "クレードル", "#b6bcc6", 1, "plan", (0, -0.6, 0), f"{bar} {fmt(spec.cradle.bar.width)} × {fmt(spec.cradle.bar.thickness)}",
-            f"枠の内法 {fmt(2 * r.frame_inner)} 角、ハンドル {fmt(spec.cradle.handle_length)}、グリップ φ{fmt(spec.cradle.grip_dia)} 丸棒"),
-        fab("pad", "当て板", "#c9ced6", 1, "outline", (0, -0.6, 0), f"{sheet} レーザー切り",
-            f"{fmt(spec.cradle.pad.width)} × {fmt(spec.cradle.pad.depth)} × t{fmt(spec.cradle.pad.thickness)}"),
-        buy("holder", "ホルダー受け", "#4b5563", 1, (0, -0.6, 0), spec.mount.type.value, f"φ{fmt(spec.mount.body_dia)} × H{fmt(spec.mount.body_height)}"),
+        fab("pad", "当て板", "#c9ced6", PAD_COUNT, "outline", (0, -0.3, 0), f"{sheet}をレーザー切りして胴の外面に沿って曲げ、胴に全周すみ肉溶接",
+            f"{fmt(spec.pad.width)} × {fmt(spec.pad.height)} × t{fmt(spec.pad.thickness)}、角 R{fmt(spec.pad.corner)}、方位 ±X 軸から後ろへ {fmt(spec.pad.angle)}°"),
+        fab("arm", "腕（コの字の管）", "#9aa5b3", 1, "plan", (0, -0.6, 0), f"{arm_stock.family}を曲げて当て板に溶接",
+            f"φ{fmt(spec.arm.pipe.od)} × t{fmt(spec.arm.pipe.thickness)}、曲げ R{fmt(spec.arm.bend_radius)}、後ろの横渡しの中心線まで {fmt(spec.arm.rear)}"
+            f"（付け根の曲げ {float(load.moment_impact) / 1000:.1f} N·m、衝撃込み。D-22）"),
+        fab("block", "ホルダー受けのブロック", "#b6bcc6", 1, "outline", (0, -0.6, 0.3), f"{sheet}の箱（または角材）を腕に溶接",
+            f"{fmt(spec.block.width)} × {fmt(spec.block.depth)} × H{fmt(spec.block.height)}（管の中心から上面）"),
+        fab("grip", "スペードグリップ", "#9aa5b3", PAD_COUNT, "none", (0, -0.9, -0.3), f"{arm_stock.family}を斜めに切って腕の後ろの角に溶接",
+            f"φ{fmt(spec.arm.pipe.od)} × t{fmt(spec.arm.pipe.thickness)} × L{fmt(spec.grip.length)}、下へ {fmt(spec.grip.drop)}°・外へ {fmt(spec.grip.out)}°"),
+        fab("grip_cap", "グリップの端板", "#c9ced6", PAD_COUNT, "outline", (0, -1.0, -0.3), f"{sheet}を円盤に切って管の端に溶接",
+            f"φ{fmt(spec.arm.pipe.od)} × t{fmt(spec.grip.cap)}"),
+        buy("holder", "ホルダー受け", "#4b5563", 1, (0, -0.6, 0.3), spec.mount.type.value,
+            f"φ{fmt(spec.mount.body_dia)} × H{fmt(spec.mount.body_height)}、つまみ φ{fmt(spec.mount.knob_dia)} × {fmt(spec.mount.knob_length)}"),
         fab("flange", "胴底フランジ", "#c9ced6", 1, "radial", (0, 0, -0.25), f"{sheet} レーザー切り（合わせ面は溶接後に平面出し）",
             f"φ{fmt(d.plate_od)} / φ{fmt(d.shell_id)} × t{fmt(spec.flange.thickness)}"),
         buy("bolt_flange", f"ボルト {spec.flange.bolt.value}（フランジ）", "#3a3f47", n_bolt, (0, 0, 0.6),

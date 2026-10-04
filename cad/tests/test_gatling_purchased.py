@@ -7,7 +7,7 @@ import math
 import cadquery as cq
 import pytest
 from gatling.params import SPEC, override
-from gatling.shapes.purchased import bolt_band, bolt_flange, bolt_tip, head, holder, lug, rod
+from gatling.shapes.purchased import bolt_flange, bolt_tip, head, holder, lug, rod
 
 
 def _box(part):
@@ -89,12 +89,20 @@ def test_six_tension_rods_hang_from_the_ear_top_with_the_head_on_the_ear():
     assert (longer.zmin, longer.zmax) == pytest.approx((60.1905, 125.1905))     # 頭の位置は変わらず、先が下がる
 
 
-def test_the_holder_clamp_stands_on_the_pad_with_a_rod_bore_along_x():
+def test_the_holder_clamp_stands_on_the_block_with_a_rod_bore_along_x_and_a_knob_to_the_rear():
     h = holder(SPEC)
     box = _box(h)
-    assert h.solids().size() == 1 and (box.zmin, box.zmax) == pytest.approx((66, 96))
-    assert (box.ymin, box.ymax) == pytest.approx((-130.5, -90.5))
-    assert not _inside(h, 0, -110.5, 81) and _inside(h, 0, -110.5, 90) and _inside(h, 0, -110.5, 72)      # 穴（φ12.7）は中ほど
+    assert h.solids().size() == 1 and (box.zmin, box.zmax) == pytest.approx((87, 117))               # ブロックの上面（管の中心 57 + 30）から 30
+    assert (box.xmin, box.xmax) == pytest.approx((-20, 20))
+    assert (box.ymin, box.ymax) == pytest.approx((-205, -140))                                    # 本体 φ40（中心 y −160）と、後ろへ 25 出るつまみ
+    assert not _inside(h, 0, -160, 102) and _inside(h, 0, -160, 111) and _inside(h, 0, -160, 93)    # 穴（φ12.7）は中ほど
+    assert _inside(h, 0, -190, 102) and _inside(h, 0, -204, 102) and not _inside(h, 0, -206, 102)    # つまみ（φ12）は後ろへ水平
+    assert not _inside(h, 0, -190, 109) and not _inside(h, 7, -190, 102)                          # つまみの太さ（半径 6）
+
+
+def test_the_holder_knob_follows_the_leaves():
+    box = _box(holder(override(SPEC, mount__knob_length=40, mount__knob_dia=8, arm__rear=200)))
+    assert box.ymin == pytest.approx(-200 - 20 - 40) and box.xmax == pytest.approx(20)
 
 
 def test_the_flange_bolts_seat_on_the_flange_top_and_reach_the_header():
@@ -118,15 +126,3 @@ def test_the_tip_bolts_stand_between_the_tubes_on_the_tube_circle():
         assert _inside(b, r * math.cos(a), r * math.sin(a), -409), k            # 軸
         assert not _inside(b, (r + 2.6) * math.cos(a), (r + 2.6) * math.sin(a), -409), k   # 軸の外（半径 2.5）
         assert not _inside(b, r * math.cos(t), r * math.sin(t), -409), k        # 管の位置には無い
-
-
-def test_the_band_bolts_run_along_y_through_the_tabs():
-    b = bolt_band(SPEC)
-    box = _box(b)
-    assert b.solids().size() == 2
-    assert (box.ymin, box.ymax) == pytest.approx((-5.25, 12.75))              # 軸 12（y = 6.75 → −5.25）と頭 6
-    assert (box.zmin, box.zmax) == pytest.approx((31.5 - 5, 31.5 + 5))
-    for side in (1, -1):                                                       # 軸 φ6 の中心は耳の中央 x = ±93
-        assert _inside(b, side * 93, 0, 31.5)
-        assert _inside(b, side * (93 + 2.9), 0, 31.5) and _inside(b, side * (93 - 2.9), 0, 31.5)
-        assert not _inside(b, side * (93 + 3.1), 0, 31.5) and not _inside(b, side * (93 - 3.1), 0, 31.5)

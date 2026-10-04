@@ -132,35 +132,51 @@ class Gasket:
 
 
 @dataclass(frozen=True)
-class Bar:
-    width: Dim
-    thickness: Dim
-
-
-@dataclass(frozen=True)
-class Band:
-    bar: Bar
-    bolt: Choice
-    bolt_length: Dim
-    rubber: Dim              # 胴との間に挟むゴムシートの厚み
-    above_flange: Dim        # フランジ上面からバンド下端まで
-    gap: Dim                 # 分割面ごとの締め代（2 つの半環の耳の間の隙間）
-
-
-@dataclass(frozen=True)
 class Pad:
-    width: Dim
-    depth: Dim
+    """当て板（左右 2 枚）。胴の外面に沿って曲げた SUS304 板を、胴に全周すみ肉溶接する（胴に穴を開けない。D-22）。"""
+
+    angle: Dim               # 方位: ±X 軸から後ろ（−Y）へ測る角度（度）。左右対称で、ラグを避けて置く
+    width: Dim               # 板幅（曲げる前。ほぼ周方向）
+    height: Dim              # 高さ。中心は胴（プレナム）の中ほど
+    thickness: Dim
+    corner: Dim              # 角の R（レーザー切りの角）
+
+
+@dataclass(frozen=True)
+class ArmPipe:
+    """腕・グリップの管。外リングと同じ手すり用の研磨管。"""
+
+    od: Dim
     thickness: Dim
 
 
 @dataclass(frozen=True)
-class Cradle:
-    bar: Bar
-    clearance: Dim           # 胴バンド外面からフレーム内面までの逃げ
-    handle_length: Dim       # 後側の横桟の外面から、グリップの中心まで
-    grip_dia: Dim
-    pad: Pad
+class Arm:
+    """コの字の管の腕。左右の当て板から半径方向に出て、後ろへ平行に伸び、後ろで横に渡ってつながる。角は曲げで丸める。"""
+
+    pipe: ArmPipe
+    bend_radius: Dim         # 曲げ半径（管の中心線）
+    stub: Dim                # 当て板の外面から、最初の曲がりの頂点（半径方向の線と後ろへの脚の交点）まで
+    rear: Dim                # 胴の中心から、後ろの横渡しの管の中心線まで
+
+
+@dataclass(frozen=True)
+class Block:
+    """ホルダー受けのブロック。後ろの横渡しの中央に溶接する四角い箱（機関部の見立て）。"""
+
+    width: Dim               # X 方向
+    depth: Dim               # Y 方向
+    height: Dim              # 管の中心の高さから上面まで
+
+
+@dataclass(frozen=True)
+class Grip:
+    """スペードグリップ（左右 2 本）。コの字の後ろの角から、斜め下・後ろ・外へ張り出す握り。端は丸い端板（キャップ）。"""
+
+    length: Dim              # 管の長さ（付け根の中心線から端板の手前まで）
+    drop: Dim                # 水平から下へ傾ける角度（度）
+    out: Dim                 # 後ろ（−Y）から外へ開く角度（度）
+    cap: Dim                 # 端板の厚み
 
 
 @dataclass(frozen=True)
@@ -168,6 +184,16 @@ class Mount:
     type: Choice             # ホルダー受けの型（L ロッド径）
     body_dia: Dim            # 簡略形状の径
     body_height: Dim
+    knob_dia: Dim            # 締めるつまみ（後ろへ水平に出す）の径
+    knob_length: Dim         # つまみの長さ（本体の外面から）
+
+
+@dataclass(frozen=True)
+class Load:
+    """付け根の強度の概算の入力（`strength.root_load`。検査ではなく仕様と D-22 の根拠）。"""
+
+    mass: Dim                # ドラム全体の質量（kg）
+    impact: Dim              # 衝撃係数
 
 
 @dataclass(frozen=True)
@@ -183,9 +209,12 @@ class GatlingSpec:
     flange: Flange
     plate: Plate
     gasket: Gasket
-    band: Band
-    cradle: Cradle
+    pad: Pad
+    arm: Arm
+    block: Block
+    grip: Grip
     mount: Mount
+    load: Load
     tuning_target: Choice
     finish: Choice
 
@@ -249,21 +278,36 @@ SPEC = GatlingSpec(
     ),
     plate=Plate(margin=design(8), max_over_shell=design(60)),
     gasket=Gasket(thickness=design(1)),
-    band=Band(
-        bar=Bar(width=design(25), thickness=design(6)), bolt=Choice("M6", Source.DESIGN),
-        bolt_length=design(12, "耳 6 + 締め代 1.5 + ねじ込み 4.5"), rubber=design(1, "胴との間に挟むゴムシート"),
-        above_flange=design(12, "フランジのボルトを抜ける空き（頭の高さ 6 + ねじ込み 5 = 11）"),
-        gap=design(1.5, "耳どうしが当たる前にゴムと胴を締める代（ゴム 1 mm を 0.4 潰すと分割面 1 つあたり約 1.3 縮む）"),
+    pad=Pad(
+        angle=design(30, "ラグ 6 個の間（ラグは 60° おき）。D-22"),
+        width=design(40, "付け根の曲げの概算から（D-22）"), height=design(60, "付け根の曲げの概算から（D-22）"),
+        thickness=provisional(2.5, "胴（1.2）への溶接で歪まないかを試作で確かめるまで"),
+        corner=design(5, "レーザー切りの角 R"),
     ),
-    cradle=Cradle(
-        bar=Bar(width=design(25), thickness=design(6)), clearance=design(15), handle_length=design(120),
-        grip_dia=provisional(28, "viewer で握りを見て決める"),
-        pad=Pad(width=design(60), depth=design(60), thickness=design(6)),
+    arm=Arm(
+        pipe=ArmPipe(od=design(25.4, _HOOP_PIPE), thickness=design(1.5, _HOOP_PIPE)),
+        bend_radius=provisional(50.8, "曲げ屋の治具に合わせる。管径の 2 倍を置いた"),
+        stub=provisional(45, "viewer で見て決める"),
+        rear=provisional(160, "viewer で見て決める"),
+    ),
+    block=Block(
+        width=provisional(60, "ホルダー受けの型が決まるまで"), depth=provisional(50, "ホルダー受けの型が決まるまで"),
+        height=provisional(30, "viewer で見て決める"),
+    ),
+    grip=Grip(
+        length=provisional(110, "viewer で握りを見て決める"), drop=provisional(30, "viewer で握りを見て決める"),
+        out=provisional(15, "viewer で握りを見て決める"), cap=design(3, "溶接の端板"),
     ),
     mount=Mount(
         type=Choice("L ロッド 12.7", Source.PROVISIONAL, "手持ちのホルダーに合わせる"),
         body_dia=provisional(40, "ホルダー受けの型が決まるまで"),
         body_height=provisional(30, "ホルダー受けの型が決まるまで"),
+        knob_dia=provisional(12, "ホルダー受けの型が決まるまで"),
+        knob_length=provisional(25, "ホルダー受けの型が決まるまで"),
+    ),
+    load=Load(
+        mass=provisional(10, "部品表の製作品の合計（約 8.0 kg）に既製品の概算（約 1 kg）を足して切り上げた置き値。実物の質量を測るまで"),
+        impact=design(3, "ホルダーに載せるとき・運搬の衝撃の見込み"),
     ),
     tuning_target=Choice("unison", Source.DESIGN, "§5.4 で定義（PR 4）"),
     finish=Choice("#400 サテン", Source.DESIGN, "D-15"),

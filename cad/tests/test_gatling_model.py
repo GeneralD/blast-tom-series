@@ -36,7 +36,7 @@ def _settle(obj):
 
 def test_discover_finds_gatling_and_reads_the_whole_contract(gatling):
     assert gatling.key == "gatling" and gatling.name() == "gatling-6-6"
-    assert len(gatling.parts()) == 21 and set(gatling.assembly()) == {p.name for p in gatling.parts()}
+    assert len(gatling.parts()) == 22 and set(gatling.assembly()) == {p.name for p in gatling.parts()}
     assert [i for i in gatling.issues() if i.fatal] == []
     assert gatling.bom() and all(r.made == "purchased" for r in gatling.bom())
 
@@ -63,7 +63,7 @@ def test_override_through_the_model_moves_the_name_the_parts_and_the_derived_val
 
 
 def test_the_default_spec_is_provisional_so_the_output_would_be_suffixed(gatling):
-    assert len(unsettled(gatling.spec)) == 23       # D-20 でリムの高さ・肉厚とロッドの頭の径・高さ（4 件）、D-21 でラグの取付ピッチが消え円盤の径・厚み（2 件）が入り、高さ（lug.height）が円盤の径に統合されて消えた（−1）
+    assert len(unsettled(gatling.spec)) == 35       # D-22 で当て板の板厚・腕の曲げ半径と長さ（3）・ブロック（3）・グリップ（3）・つまみ（2）・質量（1）が入り（+13）、グリップ丸棒の径（cradle.grip_dia）が消えた（−1）。それ以前: D-20 でリムの高さ・肉厚とロッドの頭の径・高さ（4 件）、D-21 でラグの取付ピッチが消え円盤の径・厚み（2 件）が入り、高さ（lug.height）が円盤の径に統合されて消えた（−1）
 
 
 def test_once_every_leaf_is_settled_nothing_is_provisional_and_every_derived_value_is_derived(gatling):
@@ -79,8 +79,8 @@ def test_once_every_leaf_is_settled_nothing_is_provisional_and_every_derived_val
 def test_the_full_bom_has_a_row_for_every_part_and_a_mass_for_the_fabricated_ones(gatling):
     rows = full_bom(gatling)
     fabricated = [r for r in rows if r.made == "fabricated"]
-    assert len(fabricated) == 14 and all(r.mass_g and r.mass_g > 0 for r in fabricated)
-    assert len(rows) == 14 + 12
+    assert len(fabricated) == 16 and all(r.mass_g and r.mass_g > 0 for r in fabricated)
+    assert len(rows) == 16 + 9
     tube = next(r for r in rows if r.name == "管")
     assert tube.count == 6 and tube.mass_g == pytest.approx(496.4, rel=1e-3)         # solid 1 個分
     assert tube.standard == "手すり用 #400 研磨管" and tube.dimensions.startswith("φ38.1 × t1.2 × L480")

@@ -17,14 +17,13 @@ from drumcad.stock import nearest
 
 from .bounds import at_least, at_most
 from .derived import derive
-from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_rod, lookup_screw
-from .interference import ear_clear, flange_bolts_removable, hoop_rings, mount_clear
+from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_rod, lookup_screw
+from .interference import ear_clear
 from .params import GatlingSpec
 from .placement import flange_bolt_points, levels, lug_plan, pipe_inner_radius, radii, tip_bolt_points, tube_points
 from .planar import EPS, z_overlap
 
 MIN_ENGAGEMENT = 0.75         # ねじ込み長 / 呼び径の下限（下回ると警告）
-MIN_CRADLE_CLEARANCE = 5.0    # クレードルとフープの逃げがこれ未満なら警告（mm）
 
 # 個数 → 下限。整数であること、かつ下限以上であること。
 _COUNTS = {"tube.count": 3, "lug.count": 1, "flange.bolt_count": 1, "hoop.ear.count": 1}
@@ -37,13 +36,13 @@ _POSITIVE = (
     "tube.od", "tube.thickness", "tube.length",
     "clamp.tip_thickness", "clamp.mid_thickness", "clamp.bolt_length",
     "header.thickness", "flange.thickness", "flange.bolt_seat", "flange.bolt_length", "plate.margin", "gasket.thickness",
-    "band.bar.width", "band.bar.thickness", "band.bolt_length", "band.gap",
-    "cradle.bar.width", "cradle.bar.thickness", "cradle.clearance", "cradle.handle_length", "cradle.grip_dia",
-    "cradle.pad.width", "cradle.pad.depth", "cradle.pad.thickness", "mount.body_dia", "mount.body_height",
+    "pad.width", "pad.height", "pad.thickness", "pad.corner", "arm.pipe.od", "arm.pipe.thickness", "arm.bend_radius", "arm.stub",
+    "arm.rear", "block.width", "block.depth", "block.height", "grip.length", "grip.cap", "mount.body_dia", "mount.body_height",
+    "mount.knob_dia", "mount.knob_length", "load.mass", "load.impact",
 )
 _NON_NEGATIVE = (
     "head.fit_clearance", "hoop.ear.hole_clearance", "header.hole_clearance",
-    "tube.trim_allowance", "band.rubber", "band.above_flange", "plate.max_over_shell",
+    "tube.trim_allowance", "plate.max_over_shell",
 )
 # 符号は問わないが有限であること。inf / nan は三角関数や配置の計算を割る（`bolt_phase = inf` で `cos` が ValueError）。
 _FINITE = (
@@ -52,9 +51,10 @@ _FINITE = (
     "tube.gap_ratio", "tube.protrusion_ratio",  # od に掛ける比。符号の決まりは配置の検査（tubes_apart・tube_clamps）が見る
     "clamp.mid_position",                       # 管長に対する比。0〜1 は tube_clamps が見る
     "flange.bolt_phase",                        # 位相（度）。負でも 360 超でも形は作れる
+    "pad.angle", "grip.drop", "grip.out",       # 角度（度）。範囲は mount_fits が見る
 )
 # Choice → 引く表。表に無い呼びは形が作れない。
-_TABLES = {"flange.bolt": SCREWS, "clamp.bolt": SCREWS, "band.bolt": SCREWS, "lug.thread": ROD_THREADS, "mount.type": HOLDER_RODS}
+_TABLES = {"flange.bolt": SCREWS, "clamp.bolt": SCREWS, "lug.thread": ROD_THREADS, "mount.type": HOLDER_RODS}
 
 
 def structure(spec: GatlingSpec) -> list[Issue]:
@@ -280,8 +280,7 @@ def ear_fits(spec: GatlingSpec) -> list[Issue]:
 
 def lug_fits(spec: GatlingSpec) -> list[Issue]:
     """胴の取付穴（ラグ 1 個に 1 つ、円盤の中心の高さ）が胴の高さと円盤に収まる。ロッドの通る位置が円盤の厚みと幅に収まる。
-    ラグが胴バンドに重ならない。
-
+    
     ラグは胴の外から見て丸い円盤で、軸は半径方向（円盤の径 = ラグの高さ）。ロッドは円盤の上端から縦に入り、位置は胴の外面から
     `standoff`。外縁（standoff + ロッドの半径）が円盤の厚み `depth` を超えると、ロッドが円盤の外側の面から出る（fatal）。
     円盤の径がロッドの呼び径以下だと、ロッドの外縁が円盤の幅の外に出て穴の肉が残らない（fatal）。取付穴の径以下でも、
@@ -292,8 +291,7 @@ def lug_fits(spec: GatlingSpec) -> list[Issue]:
     hole, bore = float(s.hole_dia) / 2, float(lookup_rod(s.thread))
     found = (at_least("ラグの取付穴が胴の下端（フランジ）にかかる", zc - hole, z.flange_top)
              + at_most("ラグの取付穴が胴の上端にかかる", zc + hole, z.shell_top)
-             + at_most("ロッドが円盤の厚みに収まらない（standoff + ロッドの半径 > depth）", float(s.standoff) + bore / 2, float(s.depth))
-             + at_least("ラグが胴バンドに重なる（ラグ下端とバンド上端の距離）", z.lug_bottom, z.band_top))
+             + at_most("ロッドが円盤の厚みに収まらない（standoff + ロッドの半径 > depth）", float(s.standoff) + bore / 2, float(s.depth)))
     if float(s.body_dia) <= bore + EPS:
         found.append(Issue(True, f"ラグの円盤の径がロッドの穴径以下で、ロッドの外縁が円盤の幅の外に出る（{float(s.body_dia):.2f} ≤ {bore:.2f}）"))
     if float(s.body_dia) <= float(s.hole_dia) + EPS:
@@ -301,37 +299,9 @@ def lug_fits(spec: GatlingSpec) -> list[Issue]:
     return found
 
 
-def cradle_fits(spec: GatlingSpec) -> list[Issue]:
-    """クレードルとフープの逃げ（負なら fatal、小さければ警告）、脚の高さ、胴バンド・耳・クレードルの下でフランジのボルトを抜けること。
-
-    フープの逃げは、フレームと z の範囲が重なるリング（内リング、外リングの管）だけを見る（`interference.hoop_rings`）。
-    既定ではフレームはプレナム胴の高さにあり、フープより下なので、管の外面がフレームの内面より外に出ていてもよい。
-    """
-    z, r, c = levels(spec), radii(spec), spec.cradle
-    frame_z = (z.frame_centre - float(c.bar.thickness) / 2, z.frame_top)
-    found = []
-    for name, radius, z0, z1 in hoop_rings(spec):
-        if not z_overlap(z0, z1, *frame_z):
-            continue
-        clearance = r.frame_inner - radius
-        hit = at_least(f"クレードルがフープの外径と干渉する（フレーム内面と{name}外面の逃げ）", clearance, 0.0)
-        found += hit or at_least(f"クレードルとフープの逃げが小さい（フレーム内面と{name}外面）", clearance, MIN_CRADLE_CLEARANCE, fatal=False)
-    leg = z.frame_centre - float(c.bar.thickness) / 2 - z.band_centre
-    found += at_least("クレードルの脚の高さが無い（フレームがバンドより上になければならない）", leg, EPS)
-    return found + flange_bolts_removable(spec)
-
-
-def holder_fits(spec: GatlingSpec) -> list[Issue]:
-    """ホルダー受けの本体が L ロッド穴の両側に縁（`plate.margin`）を残せる太さで、当て板に載る。"""
-    m, p = spec.mount, spec.cradle.pad
-    return (at_least("ホルダー受けの本体が L ロッド穴 + 両側の縁に足りない", float(m.body_dia),
-                      float(lookup_holder(m.type)) + 2 * float(spec.plate.margin))
-            + at_most("ホルダー受けが当て板からはみ出す", float(m.body_dia), min(float(p.width), float(p.depth))))
-
-
 def bolt_lengths(spec: GatlingSpec) -> list[Issue]:
-    """ボルトの長さ: ヘッダー・先端クランプ・バンドの耳を突き抜けない。ねじ込みが短ければ警告。"""
-    f, c, b = spec.flange, spec.clamp, spec.band
+    """ボルトの長さ: ヘッダー・先端クランプを突き抜けない。ねじ込みが短ければ警告。"""
+    f, c = spec.flange, spec.clamp
     stack = float(f.thickness) + float(spec.gasket.thickness)
     major = lambda choice: float(lookup_screw(choice).major)
     found = at_least("フランジのボルトがヘッダープレートに届かない", float(f.bolt_length), stack)
@@ -339,17 +309,6 @@ def bolt_lengths(spec: GatlingSpec) -> list[Issue]:
     found += at_least("フランジのボルトのねじ込みが短い", float(f.bolt_length) - stack, MIN_ENGAGEMENT * major(f.bolt), fatal=False)
     found += at_most("先端クランプのボルトが板を突き抜ける", float(c.bolt_length), float(c.tip_thickness))
     found += at_least("先端クランプのボルトのねじ込みが短い", float(c.bolt_length), MIN_ENGAGEMENT * major(c.bolt), fatal=False)
-    # 胴バンドのボルトは、+Y 側の耳・分割面の締め代・−Y 側の耳（タップ）の順に通る
-    found += at_least("胴バンドのボルトが −Y 側の耳に届かない（+Y 側の耳 + 締め代）", float(b.bolt_length),
-                       float(b.bar.thickness) + float(b.gap))
-    found += at_most("胴バンドのボルトが耳を突き抜ける", float(b.bolt_length), 2 * float(b.bar.thickness) + float(b.gap))
-    found += at_least("胴バンドのボルトのねじ込みが短い", float(b.bolt_length) - float(b.bar.thickness) - float(b.gap),
-                       MIN_ENGAGEMENT * major(b.bolt), fatal=False)
-    # 耳（x ≥ バンド内面、分割面から gap/2 の所）が半環の肉に重なるのは、y = gap/2 で環の外面が x > 内半径まで
-    # 来るとき（(gap/2)² < 外半径² − 内半径²）。重ならないと耳が半環から離れた別の solid になる
-    r = radii(spec)
-    found += at_most("胴バンドの締め代が広すぎて、耳が半環から離れる（締め代の半分）", float(b.gap) / 2,
-                      math.sqrt(r.band_outer ** 2 - r.band_inner ** 2) - EPS)
     return found
 
 
@@ -370,6 +329,6 @@ def issues(spec: GatlingSpec) -> list[Issue]:
     found += plate_size(float(d.plate_od), float(d.shell_id), float(d.shell_od), float(spec.plate.max_over_shell))
     found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec) + tip_bolts_clear(spec)
     found += aligned(int(float(spec.tube.count)), int(float(spec.lug.count)), int(float(spec.hoop.ear.count)))
-    found += rod_fits(spec) + hoop_seat(spec) + ear_fits(spec) + spacing(spec) + lug_fits(spec) + cradle_fits(spec) + holder_fits(spec) + bolt_lengths(spec)
-    found += ear_clear(spec) + mount_clear(spec)
+    found += rod_fits(spec) + hoop_seat(spec) + ear_fits(spec) + spacing(spec) + lug_fits(spec) + bolt_lengths(spec)
+    found += ear_clear(spec)
     return found + stock_warning(spec)

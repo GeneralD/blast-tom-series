@@ -50,9 +50,9 @@ def test_the_viewer_embeds_every_part_and_says_how_many_values_are_pending(out_d
 def test_the_bom_lists_fabricated_and_purchased_rows_with_the_total_mass(out_dir):
     md = (out_dir / "bom.md").read_text(encoding="utf-8")
     assert md.startswith("# 部品表 — gatling-6-6")
-    assert md.count("| 製作品 |") == 14 and md.count("| 既製品 |") == 12
+    assert md.count("| 製作品 |") == 16 and md.count("| 既製品 |") == 9
     kg = float(re.search(r"\*\*([\d.]+) kg\*\*", md).group(1))
-    assert 9 < kg < 12
+    assert 7.5 < kg < 8.5      # 製作品の合計（既製品の質量は載らない）。D-22 で旧クレードル・胴バンドの分（約 3.6 kg）が減った
 
 
 def test_a_fatal_configuration_exports_nothing(tmp_path, monkeypatch):

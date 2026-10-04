@@ -1,87 +1,96 @@
-"""マウント: 胴バンド（2 分割）・クレードル（フレームと脚とハンドル）・当て板。"""
+"""マウント（D-22）: 胴に溶接した当て板（左右）・コの字の管の腕・ホルダー受けのブロック・スペードグリップと端板。
+
+溶接で接する部品は体積を共有しない。腕は当て板の外面に平らな端で接し、ブロックとグリップは腕の外形の円柱
+（`_envelope`）で切って、腕の管の外面に沿わせる（鞍形・魚の口形の突き合わせ溶接の見立て）。
+"""
 
 from __future__ import annotations
 
-import math
-
 import cadquery as cq
 
-from ..fasteners import lookup_screw
 from ..params import GatlingSpec
-from ..placement import BAND_SIDES, band_bolt_x, band_tab_length, cradle_corner, cradle_y_rear, grip_y, levels, radii
-from .common import compound, cylinder, ring
+from ..placement import arm_path, grip_poses, holder_centre, levels, pad_angles, radii
+from ..tubepath import Line
+from .common import compound, ring
 
-
-def band(spec: GatlingSpec) -> cq.Workplane:
-    """胴バンド。+Y 側と −Y 側の 2 つの半環。分割面（XZ 面）の両端に耳があり、M6 で Y 方向に締める。
-
-    分割面ごとに `band.gap` の隙間を空ける（半環は y = ±gap/2 から外側）。隙間が無いと、締めても
-    先に耳どうしが当たり、ゴムシートと胴に締め付け力がかからない。
-    +Y 側の耳に通し穴、−Y 側の耳に下穴（タップ）を開ける。
-    """
-    z, r = levels(spec), radii(spec)
-    height = z.band_top - z.band_bottom
-    tab, thick = band_tab_length(spec), float(spec.band.bar.thickness)
-    half_gap = float(spec.band.gap) / 2
-    screw = lookup_screw(spec.band.bolt)
-    zc = z.band_centre
-    halves = []
-    for sign in BAND_SIDES:
-        half_box = cq.Workplane("XY").box(2 * r.band_outer, r.band_outer - half_gap, height, centered=(True, False, False))
-        body = ring(r.band_outer, r.band_inner, z.band_bottom, z.band_top).intersect(
-            half_box.translate((0, half_gap if sign > 0 else -r.band_outer, z.band_bottom)))
-        hole = float(screw.clearance if sign > 0 else screw.tap_drill)
-        for side in BAND_SIDES:
-            # 耳は半環の肉に食い込ませる（接するだけだと union が別 solid のまま残す）
-            reach = r.band_outer + tab - r.band_inner
-            x0 = r.band_inner if side > 0 else -r.band_outer - tab
-            lug = cq.Workplane("XY").box(reach, thick, height, centered=False).translate(
-                (x0, half_gap if sign > 0 else -half_gap - thick, z.band_bottom))
-            bore = cylinder((side * band_bolt_x(spec), sign * half_gap, zc), (0, sign, 0), hole, thick)
-            body = body.union(lug).cut(bore)
-        halves.append(body)
-    return compound(halves)
-
-
-CRADLE_ARMS = 4    # 4 隅の腕。先端は胴バンドに M6 で留める（溶接しない。部品表の行だけで形は持たない）
-
-
-def cradle(spec: GatlingSpec) -> cq.Workplane:
-    """クレードル。胴を囲む水平の矩形フレーム、4 隅から胴バンドへ降りる脚と腕、後端のハンドル。
-
-    フレームは平角材（幅 × 厚み）を寝かせた形で、厚みの中心が `frame_centre`。脚は垂直、腕は
-    バンドの高さで隅から胴バンドの外面まで水平に伸びる。ハンドルは左右の縦桟を後ろへ
-    `handle_length` 延ばし、先端をグリップ（丸棒）で結ぶ。
-
-    腕の先端は胴バンドに溶接しない。両方の半環を 1 つの溶接品で結ぶと半環の相対位置が固まり、
-    バンドが締まらない。腕は M6 で留め、腕の側の長穴（径方向）で位置を合わせる。組立は胴バンドを
-    胴に締めてから腕のボルトを締める。長穴とボルトは形に持たない（図面は PR 5、ボルトは部品表）。
-    """
-    z, r, c = levels(spec), radii(spec), spec.cradle
-    w, t, a = float(c.bar.width), float(c.bar.thickness), r.frame_inner
-    outer, zf = a + w, z.frame_centre
-    zb = z.band_centre
-    gy = grip_y(spec)
-
-    def box(sx: float, sy: float, sz: float, at: tuple[float, float, float]) -> cq.Workplane:
-        return cq.Workplane("XY").box(sx, sy, sz).translate(at)
-
-    body = box(2 * outer, w, t, (0, a + w / 2, zf))                                     # 前の横桟
-    body = body.union(box(2 * outer, w, t, (0, -(a + w / 2), zf)))                      # 後の横桟
-    for sx in (1, -1):
-        body = body.union(box(w, outer - gy, t, (sx * (a + w / 2), (outer + gy) / 2, zf)))   # 縦桟（後ろへ延長）
-    body = body.union(cylinder((-outer, gy, zf), (1, 0, 0), float(c.grip_dia), 2 * outer))        # グリップ
-    corner = cradle_corner(spec)
-    leg_top = zf - t / 2
-    for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
-        body = body.union(box(w, t, leg_top - zb, (sx * (a + w / 2), sy * (a + w / 2), (leg_top + zb) / 2)))   # 脚
-        arm = box(corner - r.band_outer, w, t, ((corner + r.band_outer) / 2, 0, zb))                          # 腕
-        body = body.union(arm.rotate((0, 0, 0), (0, 0, 1), math.degrees(math.atan2(sy, sx))))
-    return body
+_V = cq.Vector
 
 
 def pad(spec: GatlingSpec) -> cq.Workplane:
-    """当て板。後側の横桟の上面中央に溶接し、ホルダー受けを固定する。"""
-    z, p = levels(spec), spec.cradle.pad
-    return (cq.Workplane("XY").box(float(p.width), float(p.depth), z.pad_top - z.frame_top)
-            .translate((0, cradle_y_rear(spec), (z.frame_top + z.pad_top) / 2)))
+    """当て板（左右 2 枚）。幅 `width` × 高さ `height` の角を `corner` で丸めた矩形の柱を、胴の外面から板厚ぶんの円筒殻で切った曲げ板。
+
+    胴の外面に沿って全周すみ肉溶接する（胴に穴は開けない）。板の中心の高さは腕の管の中心と同じ（胴の中ほど）。
+    """
+    z, r, p = levels(spec), radii(spec), spec.pad
+    reach = r.pad_outer + 1.0
+    blank = (cq.Workplane("XY").box(reach, float(p.width), float(p.height)).edges("|X").fillet(float(p.corner))
+             .translate((reach / 2, 0, z.arm_centre)))
+    plate = blank.intersect(ring(r.pad_outer, r.shell, z.pad_bottom - 1, z.pad_top + 1))
+    return compound([plate.rotate((0, 0, 0), (0, 0, 1), a) for a in pad_angles(spec)])
+
+
+def _sweep(spec: GatlingSpec, bore: bool) -> cq.Workplane:
+    """腕の経路（`placement.arm_path`）に沿って管の断面を掃引した固体。`bore` が偽なら中実（他の部品を切る刃物）。"""
+    z, od, wall = levels(spec).arm_centre, float(spec.arm.pipe.od), float(spec.arm.pipe.thickness)
+    edges = []
+    for part in arm_path(spec):
+        if isinstance(part, Line):
+            if part.length > 1e-9:
+                edges.append(cq.Edge.makeLine(_V(*part.a, z), _V(*part.b, z)))
+            continue
+        point = lambda t: _V(*part.point(t), z)
+        edges.append(cq.Edge.makeThreePointArc(point(0.0), point(0.5), point(1.0)))
+    first = next(p for p in arm_path(spec) if isinstance(p, Line) and p.length > 1e-9)
+    length = first.length
+    direction = ((first.b[0] - first.a[0]) / length, (first.b[1] - first.a[1]) / length, 0.0)
+    plane = cq.Plane(origin=(*first.a, z), xDir=(0, 0, 1), normal=direction)
+    profile = cq.Workplane(plane).circle(od / 2)
+    if bore:
+        profile = profile.circle(od / 2 - wall)
+    return profile.sweep(cq.Workplane(obj=cq.Wire.assembleEdges(edges)))
+
+
+def arm(spec: GatlingSpec) -> cq.Workplane:
+    """コの字の腕。左右の当て板の外面から半径方向に出て、後ろ（−Y）へ平行に伸び、後ろで横に渡る 1 本の管。角は曲げ（円弧）で丸める。"""
+    return _sweep(spec, bore=True)
+
+
+def _envelope(spec: GatlingSpec) -> cq.Workplane:
+    return _sweep(spec, bore=False)
+
+
+def block(spec: GatlingSpec) -> cq.Workplane:
+    """ホルダー受けのブロック（機関部の見立て）。後ろの横渡しの中央に載る四角い箱で、下面は腕の管の外形で切って鞍形に抱く。
+
+    箱は管の中心の高さから上へ `height`。下の半分は管の脇（管の外形の外）に残る。
+    """
+    z, b = levels(spec), spec.block
+    x, y = holder_centre(spec)
+    box = cq.Workplane("XY").box(float(b.width), float(b.depth), float(b.height)).translate((x, y, z.arm_centre + float(b.height) / 2))
+    return box.cut(_envelope(spec))
+
+
+def _cylinder(origin: tuple[float, float, float], direction: tuple[float, float, float], radius: float, length: float) -> cq.Workplane:
+    return cq.Workplane("XY").newObject([cq.Solid.makeCylinder(radius, length, _V(*origin), _V(*direction))])
+
+
+def grip(spec: GatlingSpec) -> cq.Workplane:
+    """スペードグリップ（左右 2 本）の管。付け根（後ろの角の円弧の中央、中心線の上）から斜め下・後ろ・外へ `length`。
+    付け根は腕の管の外形で切って、腕に沿わせる（魚の口形）。端は開いたままで、端板（`grip_cap`）を溶接する。"""
+    r, wall = float(spec.arm.pipe.od) / 2, float(spec.arm.pipe.thickness)
+    envelope = _envelope(spec)
+    tubes = []
+    for pose in grip_poses(spec):
+        tube = _cylinder(pose.start, pose.direction, r, pose.length).cut(_cylinder(pose.start, pose.direction, r - wall, pose.length))
+        tubes.append(tube.cut(envelope))
+    return compound(tubes)
+
+
+def grip_cap(spec: GatlingSpec) -> cq.Workplane:
+    """スペードグリップの端板（丸い円盤。溶接）。管の端に載り、管の外径と同じ径。"""
+    r = float(spec.arm.pipe.od) / 2
+    caps = []
+    for pose in grip_poses(spec):
+        origin = tuple(s + pose.length * d for s, d in zip(pose.start, pose.direction))
+        caps.append(_cylinder(origin, pose.direction, r, pose.cap))
+    return compound(caps)

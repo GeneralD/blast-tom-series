@@ -6,8 +6,11 @@ import math
 
 import pytest
 from gatling.params import SPEC, override
-from gatling.placement import (LUG_HOLE_SIDES, LUG_HOLES, flange_bolt_points, levels, lug_angles, lug_plan,
-                               pipe_inner_radius, radii, ring_points, tip_bolt_points, tube_points)
+from gatling.planar import origin_distance
+from gatling.placement import (LUG_HOLE_SIDES, LUG_HOLES, PAD_COUNT, PAD_SIDES, arm_bends, arm_path, arm_polys, arm_vertices, block_plan,
+                               flange_bolt_points, grip_polys, grip_poses, grip_z, holder_centre, knob_plan, levels, lug_angles,
+                               lug_plan, pad_angles, pad_plan, pad_polys, pipe_inner_radius, radii, ring_points, tip_bolt_points,
+                               tube_points)
 
 
 def _angle(point):
@@ -123,13 +126,24 @@ def test_the_rod_path_from_the_ear_top_to_the_lug_bottom_adds_up_ear_pipe_takeup
     assert z.ear_top - z.lug_bottom == pytest.approx(25.4 - 5 + 5 + 30)   # 55.4（管の外径 − 頭の高さ（受金の上面は管の上端より頭の高さだけ下）+ 締め代 + 円盤の径）
 
 
-def test_the_band_sits_above_the_flange_and_the_frame_at_mid_plenum_height():
+def test_the_arm_and_the_pads_sit_at_mid_plenum_height():
     z = levels(SPEC)
-    assert (z.band_bottom, z.band_top) == (19, 44)
-    assert z.frame_centre == pytest.approx(57)
+    assert z.arm_centre == pytest.approx(57)                                                 # フランジ上面 7 + 胴の高さの半分 50
+    assert (z.arm_bottom, z.arm_top) == pytest.approx((57 - 12.7, 57 + 12.7))
+    assert (z.pad_bottom, z.pad_top) == pytest.approx((27, 87))                              # 板の高さ 60
+    moved = levels(override(SPEC, shell__plenum_height=80, pad__height=30, arm__pipe__od=20))
+    assert moved.arm_centre == pytest.approx(47) and (moved.pad_bottom, moved.pad_top) == pytest.approx((32, 62))
+    assert (moved.arm_bottom, moved.arm_top) == pytest.approx((37, 57))
 
 
-def test_the_radii_nest_from_the_shell_out_to_the_frame():
+def test_the_block_and_the_holder_stack_on_the_arm():
+    z = levels(SPEC)
+    assert z.block_top == pytest.approx(57 + 30) and z.holder_bottom == z.block_top           # ブロックの上面 = ホルダー受けの下面
+    assert (z.holder_bottom, z.holder_top) == pytest.approx((87, 117)) and z.knob_centre == pytest.approx(102)
+    assert levels(override(SPEC, block__height=40, mount__body_height=20)).holder_top == pytest.approx(57 + 40 + 20)
+
+
+def test_the_radii_nest_from_the_shell_out_to_the_pad_face():
     r = radii(SPEC)
     assert r.shell == pytest.approx(76) and r.rod == pytest.approx(86)
     assert (r.hoop_in_inner, r.hoop_in_outer) == pytest.approx((76.7, 80.7))         # ヘッド外径 155.4 / 2 − 掛かり 1.0、肉厚 4
@@ -137,14 +151,7 @@ def test_the_radii_nest_from_the_shell_out_to_the_frame():
     assert (r.hoop_out_centre, r.hoop_out_outer) == pytest.approx((103.4, 116.1))    # 管の中心・外面（φ25.4）
     assert r.hoop_in_outer < r.rod < r.hoop_out_inner                                  # ロッドはリングの間
     assert 152.4 / 2 < r.hoop_in_inner < 155.4 / 2                                     # 内リングはフレッシュフープの環の上に載る
-    assert (r.band_inner, r.band_outer, r.frame_inner) == pytest.approx((77, 83, 98))
-
-
-def test_the_pad_and_the_holder_stack_on_the_frame():
-    """当て板とホルダー受けの高さは placement に置き、形状と検査が同じ値を読む。"""
-    z = levels(SPEC)
-    assert z.frame_top == pytest.approx(57 + 3) and z.pad_top == pytest.approx(66)
-    assert (z.holder_bottom, z.holder_top) == pytest.approx((66, 96))
+    assert r.pad_outer == pytest.approx(78.5)                                          # 胴の外面 76 + 板厚 2.5
 
 
 def test_the_collar_radius_is_half_the_head_diameter():
@@ -184,3 +191,79 @@ def test_the_lug_plan_narrows_to_the_slice_of_the_disc_inside_the_z_band():
     u0, u1, v0, v1 = lug_plan(SPEC, z.lug_bottom - 5, zc - 10)                  # 帯の上端が中心の 10 下
     assert (v0, v1) == pytest.approx((-half, half)) and u1 == 96 and u0 == pytest.approx(math.sqrt(76**2 - half**2))
     assert lug_plan(SPEC, z.lug_top, z.lug_top + 5) == pytest.approx((76.0, 96, 0.0, 0.0), abs=1e-6)   # 上端の線
+
+
+def test_the_pads_are_a_mirror_pair_between_the_lugs():
+    assert PAD_SIDES == (1, -1) and PAD_COUNT == 2
+    assert pad_angles(SPEC) == pytest.approx([330, 210])                                      # ±X 軸から後ろへ 30°
+    assert all(a not in lug_angles(SPEC) for a in pad_angles(SPEC))                           # ラグ（0°, 60°, …）の間
+    assert pad_angles(override(SPEC, pad__angle=45)) == pytest.approx([315, 225])
+    assert pad_angles(override(SPEC, pad__angle=0)) == pytest.approx([0, 180])
+
+
+def test_the_pad_plan_is_the_blank_width_between_the_shell_and_the_pad_face():
+    """u0 は側縁（v = ±半幅）で胴の外面に触れる所 √(R² − 半幅²)、u1 は板の外面 R + 板厚。lug_plan と同じ作り。"""
+    assert pad_plan(SPEC) == pytest.approx((math.sqrt(76**2 - 20**2), 78.5, -20, 20))
+    assert pad_plan(override(SPEC, pad__width=30, pad__thickness=4)) == pytest.approx((math.sqrt(76**2 - 15**2), 80, -15, 15))
+    polys = pad_polys(SPEC)
+    assert len(polys) == 2 and polys[0][1] != polys[1][1]
+
+
+def test_the_arm_runs_from_the_pad_face_back_to_a_crossing_and_is_mirror_symmetric():
+    v = arm_vertices(SPEC)
+    face = 78.5
+    assert len(v) == 6
+    assert v[0] == pytest.approx((face * math.cos(math.radians(30)), -face * math.sin(math.radians(30))))       # 右の当て板の外面
+    assert math.hypot(*v[1]) == pytest.approx(78.5 + 45)                                                       # 半径方向に stub
+    assert v[2] == pytest.approx((v[1][0], -160)) and v[3] == pytest.approx((-v[2][0], -160))                  # 脚は後ろへ平行、横渡し
+    assert [(-x, y) for x, y in v[::-1]] == pytest.approx(v)                                                   # 左右対称
+    path = arm_path(SPEC)
+    assert len(path) == 9 and [type(p).__name__ for p in path[1::2]] == ["Arc"] * 4
+    assert all(p.radius == pytest.approx(50.8) for p in path[1::2])
+
+
+def test_the_arm_bends_leave_room_on_every_leg_by_default():
+    bends = arm_bends(SPEC)
+    t1, t2 = 50.8 * math.tan(math.radians(30)), 50.8                                          # 曲がり 60° と 90°
+    assert bends.stub_free == pytest.approx(45 - t1) and bends.stub_free > 0
+    y1 = (78.5 + 45) * math.sin(math.radians(30))
+    assert bends.leg_free == pytest.approx(160 - y1 - t1 - t2) and bends.leg_free > 0
+    assert bends.cross_half == pytest.approx((78.5 + 45) * math.cos(math.radians(30)) - 50.8)
+    tight = arm_bends(override(SPEC, arm__stub=t1))                                           # 接線の長さちょうど: 当て板に曲げの接点が届く
+    assert tight.stub_free == pytest.approx(0, abs=1e-9)
+
+
+def test_the_arm_plan_is_covered_by_convex_polygons_that_reach_the_pad_face():
+    polys = arm_polys(SPEC)
+    assert 50 < len(polys) < 120
+    assert min(math.hypot(x, y) for poly in polys for x, y in poly) >= 78.5 - 1e-6 - 12.7       # 平らな端の角は管の半径ぶん外れる
+    assert min(origin_distance(poly) for poly in polys) == pytest.approx(78.5)                    # 腕の最も胴に近い所は当て板の外面
+
+
+def test_the_holder_and_the_block_sit_on_the_rear_crossing_centre_line():
+    assert holder_centre(SPEC) == (0.0, -160.0) and holder_centre(override(SPEC, arm__rear=200)) == (0.0, -200.0)
+    block = block_plan(SPEC)
+    assert sorted(block) == pytest.approx(sorted([(-30, -185), (30, -185), (30, -135), (-30, -135)]))
+    assert sorted(knob_plan(SPEC)) == pytest.approx(sorted([(-6, -205), (6, -205), (6, -179), (-6, -179)]))   # 本体の外面 −180 から後ろへ 25（1 食い込む）
+
+
+def test_the_spade_grips_start_in_the_middle_of_the_rear_bends_and_point_down_back_and_out():
+    right, left = grip_poses(SPEC)
+    d = right.direction
+    assert math.hypot(*d) == pytest.approx(1) and d[2] == pytest.approx(-0.5)                  # 下へ 30°
+    assert d[0] == pytest.approx(math.sin(math.radians(15)) * math.cos(math.radians(30))) and d[1] < 0
+    assert left.direction == pytest.approx((-d[0], d[1], d[2])) and left.start == pytest.approx((-right.start[0], right.start[1], right.start[2]))
+    cx, cy = -50.8 + 123.5 * math.cos(math.radians(30)), -160 + 50.8
+    assert right.start[:2] == pytest.approx((cx + 50.8 * math.cos(math.pi / 4), cy - 50.8 * math.sin(math.pi / 4)))   # 円弧の中央
+    assert right.start[2] == pytest.approx(57) and (right.length, right.cap) == (110, 3)
+
+
+def test_the_grip_plan_and_z_range_cover_the_sloped_tube_and_its_cap():
+    polys = grip_polys(SPEC)
+    low, high = grip_z(SPEC)
+    right = grip_poses(SPEC)[0]
+    end = right.start[2] + 113 * right.direction[2]
+    assert low == pytest.approx(end - 12.7) and high == pytest.approx(57 + 12.7)
+    xs = [x for x, _ in polys[0]]
+    assert max(xs) > right.start[0] + 113 * right.direction[0]                                 # 端の円は斜めに見えて、前後に広がる
+    assert grip_z(override(SPEC, grip__drop=0))[0] == pytest.approx(57 - 12.7)

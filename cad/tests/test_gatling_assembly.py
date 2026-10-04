@@ -21,7 +21,7 @@ def built():
 
 def test_assembly_and_parts_have_the_same_names_in_the_same_order(built):
     assert list(built) == [p.name for p in parts(SPEC)]
-    assert len(built) == 21
+    assert len(built) == 22
 
 
 def test_every_part_has_exactly_count_solids_so_the_build_does_not_stop(built):
@@ -33,9 +33,9 @@ def test_every_part_has_exactly_count_solids_so_the_build_does_not_stop(built):
 def test_the_counts_are_the_spec_counts():
     n = {p.name: p.count for p in parts(SPEC)}
     assert (n["tube"], n["lug"], n["rod"], n["ear"], n["bolt_flange"], n["bolt_tip"]) == (6, 6, 6, 6, 6, 6)
-    assert (n["band"], n["bolt_band"]) == (2, 2)
+    assert (n["pad"], n["grip"], n["grip_cap"]) == (2, 2, 2)                         # 左右 1 組ずつ
     assert all(n[k] == 1 for k in ("head", "shell", "edge", "flange", "gasket", "header", "clamp_mid", "clamp_tip",
-                                   "hoop_inner", "hoop_outer", "cradle", "pad", "holder"))
+                                   "hoop_inner", "hoop_outer", "arm", "block", "holder"))
 
 
 def test_changing_the_spec_changes_the_counts_and_the_solids_together():
@@ -78,7 +78,7 @@ def test_the_standards_of_the_purchased_parts_follow_the_choices():
 
 def test_every_part_is_marked_fabricated_or_purchased_with_a_valid_colour():
     made = {p.name: p.made for p in parts(SPEC)}
-    assert {k for k, v in made.items() if v == "purchased"} == {"head", "lug", "rod", "holder", "bolt_band", "bolt_flange", "bolt_tip"}
+    assert {k for k, v in made.items() if v == "purchased"} == {"head", "lug", "rod", "holder", "bolt_flange", "bolt_tip"}
     assert all(re.fullmatch(r"#[0-9a-f]{6}", p.color) for p in parts(SPEC))
     assert all(len(p.explode) == 3 for p in parts(SPEC))
 
@@ -90,17 +90,19 @@ def test_fabricated_parts_are_sus304_and_the_gasket_is_silicone():
 
 
 def test_the_spec_section_5_1_mass_check(built):
-    """§5.1 の概算（管 3.0 kg、胴 0.45、ヘッダープレートとフランジで 1.5）に収まる。クレードルは概算（1.2 kg）より重い。"""
+    """§5.1 の概算（管 3.0 kg、胴 0.45、ヘッダープレートとフランジで 1.5）に収まる。マウントは腕・ブロック・グリップ・当て板で約 1.3 kg。"""
     mass = {p.name: mass_g(built[p.name], p.material) for p in parts(SPEC) if p.made == "fabricated"}
     assert mass["tube"] == pytest.approx(3000, rel=0.02) and mass["shell"] == pytest.approx(450, rel=0.02)
     assert mass["header"] + mass["flange"] == pytest.approx(1500, rel=0.05)
-    assert mass["cradle"] > 2000                                  # 仕様の概算 1.2 kg より重い（置いた仮定を参照）
-    assert 9000 < sum(mass.values()) < 12000                      # 概算 9 kg は既製品込み。製作品だけで 10 kg 前後
+    assert 1000 < sum(mass[k] for k in ("pad", "arm", "block", "grip", "grip_cap")) < 1600    # D-22: 旧クレードル・胴バンド（約 3.6 kg）より軽い
+    fabricated = sum(mass.values())
+    assert 7500 < fabricated < 8500                               # 製作品の合計（約 8.0 kg）。旧クレードル・胴バンドの分（約 3.6 kg）が減り、§5.1 の概算 9 kg（既製品込み）に近づく
+    assert fabricated < 1000 * float(SPEC.load.mass) < 1.4 * fabricated     # 強度の概算の質量は、製作品の合計に既製品を足した値（過小でも過大でもない）
 
 
 # 溶接・ねじ込みで接する部品は体積を共有しない。ただしボルトの軸（呼び径）は下穴（ねじの谷径）より太いので、
-# ねじ込み先と重なる。この 3 組だけは重なりを許す。
-THREADED = {frozenset(("bolt_flange", "header")), frozenset(("bolt_tip", "clamp_tip")), frozenset(("bolt_band", "band"))}
+# ねじ込み先と重なる。この 2 組だけは重なりを許す。
+THREADED = {frozenset(("bolt_flange", "header")), frozenset(("bolt_tip", "clamp_tip"))}
 
 
 def _compound(part):

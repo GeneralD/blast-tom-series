@@ -95,12 +95,6 @@ def test_a_rod_head_no_larger_than_the_ear_hole_falls_through():
     assert not any("抜ける" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=6.6))))
 
 
-def test_a_lug_that_hangs_onto_the_band_is_fatal():
-    # ラグの上端 94.79。円盤の径 50.79 で下端がバンド上端 44 にちょうど届く
-    assert any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=50.9))))
-    assert not any("バンド" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=50.7))))
-
-
 def test_the_mounting_hole_that_runs_past_the_ends_of_the_shell_is_fatal():
     # 円盤の中心の高さ（既定 79.79 = 上端 − 円盤の径 / 2）に穴が 1 つ。下端はフランジ上面 7、上端は胴の上端 107
     assert not any("フランジ" in w for w in _fatal(lug_fits(override(SPEC, lug__body_dia=170))))       # 中心 9.79、穴の下縁 7.29 > 7

@@ -29,7 +29,6 @@ def test_the_default_spec_has_no_fatal_issue_and_only_the_two_known_radial_wall_
     ("中間クランプの比が範囲外", {"clamp.mid_position": 1.2}, "1 を超える"),
     ("ロッドがリングの間に入らない", {"hoop.gap": 4}, "外リング"),
     ("ロッドが短い", {"lug.rod_length": 20}, "ロッドが短い"),
-    ("クレードルがフープに干渉", {"shell.plenum_height": 10}, "クレードルがフープ"),
     ("受金が内リングに溶接できない", {"hoop.inner.height": 5}, "溶接できない"),
     ("個数が整数でない", {"tube.count": 6.5}, "整数"),
 ])

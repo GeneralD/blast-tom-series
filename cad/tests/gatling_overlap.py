@@ -10,7 +10,7 @@ import itertools
 import cadquery as cq
 from gatling.assemble import assembly
 
-THREADED = {frozenset(p) for p in [("band", "bolt_band"), ("bolt_flange", "header"), ("clamp_tip", "bolt_tip")]}
+THREADED = {frozenset(p) for p in [("bolt_flange", "header"), ("clamp_tip", "bolt_tip")]}
 MIN_VOLUME = 1e-3   # mm³。これ以下の交差は浮動小数の誤差とみなす
 
 
