@@ -4,7 +4,8 @@
 だから **ここでは形状を作らず、例外も投げない**。個数・規格表・正値の検査（`structure`）に
 引っかかったら、その場で返す（`derive()` が `sin(180°/個数)` で割るため）。
 
-部品どうしの干渉（平面形と z の範囲の重なり）は `interference.py`、平面の幾何は `planar.py` に置く。
+部品どうしの干渉（平面形と z の範囲の重なり。当て板・腕・ブロック・グリップ・ホルダー受けを含む）は `interference.py`、
+平面の幾何は `planar.py` に置く。当て板・腕・ブロック・グリップ・ホルダー受け（D-22）の寸法の噛み合わせは `mount_fits`。
 """
 
 from __future__ import annotations
@@ -17,10 +18,10 @@ from drumcad.stock import nearest
 
 from .bounds import at_least, at_most
 from .derived import derive
-from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_rod, lookup_screw
-from .interference import ear_clear
+from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_rod, lookup_screw
+from .interference import ear_clear, flange_bolts_removable, mount_clear
 from .params import GatlingSpec
-from .placement import flange_bolt_points, levels, lug_plan, pipe_inner_radius, radii, tip_bolt_points, tube_points
+from .placement import arm_bends, flange_bolt_points, grip_z, levels, lug_plan, pipe_inner_radius, radii, tip_bolt_points, tube_points
 from .planar import EPS, z_overlap
 
 MIN_ENGAGEMENT = 0.75         # ねじ込み長 / 呼び径の下限（下回ると警告）
@@ -299,6 +300,49 @@ def lug_fits(spec: GatlingSpec) -> list[Issue]:
     return found
 
 
+def mount_fits(spec: GatlingSpec) -> list[Issue]:
+    """当て板・腕・ブロック・グリップ・ホルダー受けの寸法が噛み合う（D-22）。形を作る前に、作れない値を止める。
+
+    当て板は胴（プレナム）の高さに収まり、腕の管より広く、角の R が板に収まる。方位は [0°, 90°)（後ろ側の左右）。
+    腕の曲げ半径は管の半径より大きく（小さいと掃引が折れる）、直線部が負にならない（曲げの接点が隣の曲げや当て板の内側に入ると
+    経路が折れ返る）。曲げ半径が管の外径の 1.5 倍に足りなければ警告（手すり管の曲げの目安。冷間曲げで潰れ・シワが出やすい）。
+    ブロックは後ろの直線部に収まり、腕の中心線より高く、ホルダー受けの本体はブロックの上面に収まって、ロッド径より太い。
+    グリップは角度が [0°, 90°) で、上端がフープの上端を超えない（リムショットの邪魔）。
+    """
+    pad, arm, block, mount, grip = spec.pad, spec.arm, spec.block, spec.mount, spec.grip
+    z, od = levels(spec), float(arm.pipe.od)
+    found = []
+    for what, value in (("当て板の方位", float(pad.angle)), ("グリップの落ち角", float(grip.drop)), ("グリップの開き角", float(grip.out))):
+        if not 0 <= value < 90:
+            found.append(Issue(True, f"{what} {value:g}° は 0° 以上 90° 未満でなければならない"))
+    if found:
+        return found                       # 角度が外れた値では、後の配置（腕の経路・グリップの向き）が成り立たない
+    if 2 * float(arm.pipe.thickness) >= od:
+        found.append(Issue(True, f"腕の管の肉厚 {float(arm.pipe.thickness):g} が外径 {od:g} の半分以上で、穴が無い"))
+    found += at_most("当て板が胴（プレナム）の高さに収まらない（板の高さ > プレナムの高さ）", float(pad.height), float(spec.shell.plenum_height))
+    found += at_least("当て板が腕の管より狭い（板幅 < 管の外径）", float(pad.width), od)
+    found += at_least("当て板が腕の管より低い（板の高さ < 管の外径）", float(pad.height), od)
+    found += at_most("当て板の角の R が板に収まらない（R > 板の幅・高さの小さいほうの半分）", float(pad.corner),
+                     min(float(pad.width), float(pad.height)) / 2)
+    if float(arm.bend_radius) <= od / 2 + EPS:
+        found.append(Issue(True, f"腕の曲げ半径 {float(arm.bend_radius):g} が管の半径 {od / 2:g} 以下で、掃引が折れる"))
+    found += at_least("腕の曲げ半径が管の外径の 1.5 倍に足りず、曲げで潰れやすい", float(arm.bend_radius), 1.5 * od, fatal=False)
+    if float(arm.bend_radius) > od / 2 + EPS:
+        bends = arm_bends(spec)
+        found += at_least("腕の当て板から最初の曲げまでの直線が負（曲げの接点が当て板の内側に入る。stub が短いか曲げ半径が大きい）",
+                          bends.stub_free, 0.0)
+        found += at_least("腕の後ろへの脚の直線が負（曲げどうしが重なる。rear が短いか曲げ半径が大きい）", bends.leg_free, 0.0)
+        found += at_least("腕の後ろの横渡しの直線が負（左右の曲げが中央で重なる）", bends.cross_half, 0.0)
+        found += at_most("ブロックが後ろの横渡しの直線部に収まらない（ブロックの幅 > 直線部の長さ）", float(block.width), 2 * bends.cross_half)
+    found += at_least("ブロックの上面が腕の中心線より低い（ブロックの高さ < 管の半径）", float(block.height), od / 2)
+    found += at_most("ホルダー受けの本体がブロックからはみ出す（径 > ブロックの幅・奥行きの小さいほう）", float(mount.body_dia),
+                     min(float(block.width), float(block.depth)))
+    found += at_least("ホルダー受けの本体の径がロッド径に足りず、ロッドの穴が通らない", float(mount.body_dia),
+                      float(lookup_holder(mount.type)) + EPS)
+    found += at_most("グリップの上端がフープの上端より上に出て、リムショットの邪魔になる", grip_z(spec)[1], z.hoop_top)
+    return found
+
+
 def bolt_lengths(spec: GatlingSpec) -> list[Issue]:
     """ボルトの長さ: ヘッダー・先端クランプを突き抜けない。ねじ込みが短ければ警告。"""
     f, c = spec.flange, spec.clamp
@@ -316,7 +360,9 @@ def stock_warning(spec: GatlingSpec) -> list[Issue]:
     """管束の管と外リングの管の外径・肉厚が規格からずれていれば警告（`stock.nearest`）。"""
     _, tube = nearest(float(spec.tube.od), float(spec.tube.thickness))
     _, pipe = nearest(float(spec.hoop.outer.od), float(spec.hoop.outer.thickness))
-    return ([tube] if tube else []) + ([Issue(False, f"外リングの管: {pipe.what}")] if pipe else [])
+    _, arm = nearest(float(spec.arm.pipe.od), float(spec.arm.pipe.thickness))
+    return ([tube] if tube else []) + ([Issue(False, f"外リングの管: {pipe.what}")] if pipe else []) + (
+        [Issue(False, f"腕の管: {arm.what}")] if arm else [])
 
 
 def issues(spec: GatlingSpec) -> list[Issue]:
@@ -330,5 +376,8 @@ def issues(spec: GatlingSpec) -> list[Issue]:
     found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec) + tip_bolts_clear(spec)
     found += aligned(int(float(spec.tube.count)), int(float(spec.lug.count)), int(float(spec.hoop.ear.count)))
     found += rod_fits(spec) + hoop_seat(spec) + ear_fits(spec) + spacing(spec) + lug_fits(spec) + bolt_lengths(spec)
+    found += mount_fits(spec)
+    if not any(i.fatal for i in found):        # 配置が成り立たない値（折れた経路など）では平面形を作らない
+        found += mount_clear(spec) + flange_bolts_removable(spec)
     found += ear_clear(spec)
     return found + stock_warning(spec)

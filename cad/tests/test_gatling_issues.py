@@ -31,6 +31,12 @@ def test_the_default_spec_has_no_fatal_issue_and_only_the_two_known_radial_wall_
     ("ロッドが短い", {"lug.rod_length": 20}, "ロッドが短い"),
     ("受金が内リングに溶接できない", {"hoop.inner.height": 5}, "溶接できない"),
     ("個数が整数でない", {"tube.count": 6.5}, "整数"),
+    ("当て板がラグに当たる", {"pad.angle": 20}, "当て板がラグ"),
+    ("腕の曲げが折れる（脚が短い）", {"arm.rear": 130}, "後ろへの脚"),
+    ("腕の曲げ半径が管の半径以下", {"arm.bend_radius": 5}, "掃引が折れる"),
+    ("ホルダー受けが外リングに当たる", {"arm.rear": 120, "arm.bend_radius": 30}, "ホルダー受けが外リング"),
+    ("ブロックが横渡しに収まらない", {"block.width": 120}, "横渡し"),
+    ("グリップの角度が範囲外", {"grip.drop": 95}, "落ち角"),
 ])
 def test_each_failure_the_spec_names_is_caught(label, values, fragment):
     found = _fatal(override(SPEC, **values))
@@ -69,3 +75,9 @@ def test_issues_never_raises_on_a_spec_that_cannot_be_built():
 def test_issues_reports_several_physical_problems_at_once():
     found = _fatal(override(SPEC, tube__gap_ratio=0, lug__count=4, clamp__mid_position=1.2))
     assert len(found) >= 4
+
+
+def test_a_folded_arm_path_stops_before_any_plan_is_built():
+    """曲げ半径が大きく経路が折れる値は、平面形の検査（例外を投げうる）に進まず、寸法の検査で止まる。"""
+    found = issues(override(SPEC, arm__bend_radius=70, pad__angle=89))
+    assert fatal_count(found) >= 1
