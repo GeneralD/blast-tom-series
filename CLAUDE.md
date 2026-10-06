@@ -14,7 +14,7 @@
 - main は PR 経由のみ。ルールセットで直接 push と削除を止めている。
 - 1 PR 1 計画。計画は superpowers:executing-plans か subagent-driven-development で実行する。
 - 後続 PR の計画は、前の PR が main に入ってから書く。基盤の実際の API に依存するため。
-- テスト: `uv run --project cad pytest cad/tests -q`。初回は cadquery の読み込みで 1〜2 分かかる。形状を作るテストが多く、全体で 2 分ほどかかる。
+- テスト: `uv run --project cad pytest cad/tests -q`。初回は cadquery の読み込みで 1〜2 分かかる。形状を作るテストが多く、全体で 2〜3 分（約 160 秒）かかる。
 - build: `uv run --project cad python cad/build.py`。
 - `cad/` の Python を書くときの決まりは `.claude/rules/cad-dimensions.md`（寸法は出典つき）。
 
