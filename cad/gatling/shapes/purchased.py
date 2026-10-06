@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import cadquery as cq
 
-from ..fasteners import lookup_holder, lookup_rod, lookup_screw
+from drumcad.fasteners import lookup_screw
+from drumcad.solids import around_z, compound, cylinder, cylinders, disc, ring
+
+from ..fasteners import lookup_holder, lookup_rod
 from ..params import GatlingSpec
 from ..placement import KNOB_EMBED, flange_bolt_points, holder_centre, knob_rim, levels, lug_angles, radii, tip_bolt_points
-from .common import around_z, compound, cylinder, cylinders, disc, ring
 
 
 def head(spec: GatlingSpec) -> cq.Workplane:

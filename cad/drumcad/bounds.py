@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from drumcad.checks import Issue
-
+from .checks import Issue
 from .planar import EPS
 
 

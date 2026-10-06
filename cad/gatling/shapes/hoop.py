@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import cadquery as cq
 
+from drumcad.solids import around_z, ring
+
 from ..params import GatlingSpec
 from ..placement import ear_hole_dia, levels, lug_angles, radii
-from .common import around_z, ring
 
 
 def hoop_inner(spec: GatlingSpec) -> cq.Workplane:

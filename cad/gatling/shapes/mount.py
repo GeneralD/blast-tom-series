@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import cadquery as cq
 
+from drumcad.solids import compound, cylinder, ring
+from drumcad.tubepath import Line
+
 from ..params import GatlingSpec
 from ..placement import arm_path, grip_poses, holder_centre, levels, pad_angles, radii
-from ..tubepath import Line
-from .common import compound, cylinder, ring
 
 _V = cq.Vector
 

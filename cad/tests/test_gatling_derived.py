@@ -6,8 +6,8 @@ import dataclasses
 import math
 
 import pytest
-from drumcad.dims import Choice, Dim, Source, as_provisional, design, walk
-from gatling.derived import Derived, derive, derived_from, name, shell_od
+from drumcad.dims import Choice, Dim, Source, as_provisional, derived_from, design, walk
+from gatling.derived import Derived, derive, name, shell_od
 from gatling.params import SPEC, override
 
 

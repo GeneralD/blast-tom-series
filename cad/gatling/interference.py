@@ -5,7 +5,7 @@
 `ear_clear` は受金とフレッシュフープの重なり。`issues()`（`checks.py`）から呼ぶ。ここでも形状は作らず、例外も投げない。
 
 平面形はどれも実際の形を覆う凸多角形（または円）で、見落とす側にはずれない。腕は曲げを 5° ごとの四角形に分けて覆う
-（`tubepath.plan_polygons`）。傾いたグリップは前後に管の半径ずつ広げた矩形と、端板までを含む z の範囲で見る。
+（`drumcad.tubepath.plan_polygons`）。傾いたグリップは前後に管の半径ずつ広げた矩形と、端板までを含む z の範囲で見る。
 """
 
 from __future__ import annotations
@@ -13,15 +13,16 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from drumcad.bounds import at_least
 from drumcad.checks import Issue
+from drumcad.fasteners import lookup_screw
+from drumcad.planar import EPS, Point, circle_overlaps, origin_distance, polygons_overlap, rect, z_overlap
 
-from .bounds import at_least
 from .derived import derive
-from .fasteners import lookup_rod, lookup_screw
+from .fasteners import lookup_rod
 from .params import GatlingSpec
 from .placement import (arm_polys, block_plan, flange_bolt_points, grip_polys, grip_z, holder_centre, knob_plan, levels, lug_angles,
                         lug_plan, pad_polys, radii)
-from .planar import EPS, Point, circle_overlaps, origin_distance, polygons_overlap, rect, z_overlap
 
 
 # 部品の名前（表示名）。引くキーと表示を 1 か所に置く: 文字列の書き写しだと、名前を直したときに引けず、`ear_clear` は

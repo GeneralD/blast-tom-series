@@ -5,25 +5,26 @@
 引っかかったら、その場で返す（`derive()` が `sin(180°/個数)` で割るため）。
 
 部品どうしの干渉（平面形と z の範囲の重なり。当て板・腕・ブロック・グリップ・ホルダー受けを含む）は `interference.py`、
-平面の幾何は `planar.py` に置く。当て板・腕・ブロック・グリップ・ホルダー受け（D-22）の寸法の噛み合わせは `mount_fits`。
+平面の幾何は `drumcad/planar.py`（機種によらない）に置く。当て板・腕・ブロック・グリップ・ホルダー受け（D-22）の寸法の噛み合わせは `mount_fits`。
 """
 
 from __future__ import annotations
 
 import math
 
+from drumcad.bounds import at_least, at_most
 from drumcad.checks import Issue
 from drumcad.dims import walk
+from drumcad.fasteners import SCREWS, lookup_screw
+from drumcad.planar import EPS, z_overlap
 from drumcad.stock import nearest
 
-from .bounds import at_least, at_most
 from .derived import derive, shell_od
-from .fasteners import HOLDER_RODS, ROD_THREADS, SCREWS, lookup_holder, lookup_rod, lookup_screw
+from .fasteners import HOLDER_RODS, ROD_THREADS, lookup_holder, lookup_rod
 from .interference import ear_clear, flange_bolts_removable, mount_clear
 from .params import GatlingSpec
 from .placement import (arm_bends, ear_hole_dia, flange_bolt_points, grip_z, levels, lug_plan, pipe_inner_radius, radii, tip_bolt_points,
                         tube_hole_dia, tube_points)
-from .planar import EPS, z_overlap
 
 MIN_ENGAGEMENT = 0.75         # ねじ込み長 / 呼び径の下限（下回ると警告）
 

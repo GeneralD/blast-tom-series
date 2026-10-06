@@ -6,7 +6,7 @@ import math
 
 import pytest
 from gatling.params import SPEC, override
-from gatling.planar import origin_distance
+from drumcad.planar import origin_distance
 from gatling.placement import (LUG_HOLE_OFFSETS, LUG_HOLES, PAD_COUNT, PAD_SIDES, arm_bends, arm_path, arm_polys, arm_vertices, block_plan,
                                flange_bolt_points, grip_polys, grip_poses, grip_z, holder_centre, knob_plan, levels, lug_angles,
                                lug_plan, pad_angles, pad_plan, pad_polys, pipe_inner_radius, radii, ring_points, tip_bolt_points,

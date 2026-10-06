@@ -12,11 +12,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from drumcad.planar import Point, rect
+from drumcad.tubepath import Path, Vec, fillet, plan_polygons, tangent_length, turn_angle
+
 from .derived import MIL, derive
 from .fasteners import lookup_rod
 from .params import GatlingSpec
-from .planar import Point, rect
-from .tubepath import Path, Vec, fillet, plan_polygons, tangent_length, turn_angle
 
 # 当て板とスペードグリップは左右 1 枚（本）ずつ（D-22）。+X 側と −X 側の符号でループし、員数は `PAD_COUNT` で数える。
 PAD_SIDES = (1, -1)
@@ -262,7 +263,7 @@ def arm_path(spec: GatlingSpec) -> Path:
 
 
 def arm_polys(spec: GatlingSpec) -> list[list[Point]]:
-    """腕（管）の平面形を覆う凸多角形。直線は厳密な矩形、曲げは細かく分けた四角形（`tubepath.plan_polygons`）。"""
+    """腕（管）の平面形を覆う凸多角形。直線は厳密な矩形、曲げは細かく分けた四角形（`drumcad.tubepath.plan_polygons`）。"""
     return plan_polygons(arm_path(spec), float(spec.arm.pipe.od) / 2)
 
 

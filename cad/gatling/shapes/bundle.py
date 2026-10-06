@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import cadquery as cq
 
+from drumcad.fasteners import lookup_screw
+from drumcad.solids import cylinders, disc, ring
+
 from ..derived import derive
-from ..fasteners import lookup_screw
 from ..params import GatlingSpec
 from ..placement import flange_bolt_points, levels, tip_bolt_points, tube_hole_dia, tube_points
-from .common import cylinders, disc, ring
 
 
 def header(spec: GatlingSpec) -> cq.Workplane:

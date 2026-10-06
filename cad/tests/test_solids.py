@@ -6,7 +6,7 @@ import math
 
 import cadquery as cq
 import pytest
-from gatling.shapes.common import around_z, compound, cylinder, cylinders, disc, ring
+from drumcad.solids import around_z, compound, cylinder, cylinders, disc, ring
 
 
 def _volume(part):

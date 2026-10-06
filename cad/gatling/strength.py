@@ -15,9 +15,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from drumcad.dims import Dim
+from drumcad.dims import Dim, derived_from
 
-from .derived import derived_from
 from .params import GatlingSpec
 from .placement import holder_centre
 

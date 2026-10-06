@@ -6,10 +6,11 @@ import math
 
 import cadquery as cq
 
+from drumcad.solids import cylinder, ring
+
 from ..derived import derive
 from ..params import GatlingSpec
 from ..placement import LUG_HOLE_OFFSETS, levels, lug_angles, radii
-from .common import cylinder, ring
 
 
 def shell(spec: GatlingSpec) -> cq.Workplane:

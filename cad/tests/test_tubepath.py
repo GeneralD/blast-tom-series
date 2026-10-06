@@ -5,8 +5,8 @@ from __future__ import annotations
 import math
 
 import pytest
-from gatling.planar import circle_overlaps, origin_distance
-from gatling.tubepath import Arc, Line, fillet, plan_polygons, tangent_length, turn_angle
+from drumcad.planar import circle_overlaps, origin_distance
+from drumcad.tubepath import Arc, Line, fillet, plan_polygons, tangent_length, turn_angle
 
 
 def _length(path):

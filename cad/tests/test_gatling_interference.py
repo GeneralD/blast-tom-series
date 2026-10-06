@@ -15,9 +15,9 @@ import pytest
 import gatling.interference as interference
 from gatling.interference import _round_parts, _tube_bundle, ear_clear, flange_bolts_removable, mount_bodies, mount_clear, Body
 from gatling.params import SPEC, override
-from gatling.fasteners import lookup_screw
+from drumcad.fasteners import lookup_screw
 from gatling.placement import arm_polys, block_plan, grip_polys, grip_z, holder_centre, levels, lug_angles, pad_polys, radii
-from gatling.planar import origin_distance
+from drumcad.planar import origin_distance
 from gatling_overlap import overlaps
 
 
