@@ -122,7 +122,11 @@ def _angle_apart(a: float, b: float) -> float:
 
 
 def bolt_clearances(spec: GatlingSpec) -> list[Issue]:
-    """フランジのボルト穴: 管外面・板縁・胴への距離が縁以上、管の方位からずれている。"""
+    """フランジのボルト穴: 管外面・板縁・胴への距離が縁以上、管の方位からずれている。
+
+    板縁の距離は恒真（fatal になる入力は作れない）: 板径は ボルト円 + 2 × 縁 以上に導かれる（`derive` の `plate_od`）。
+    `plate_size` の下限と同じく、板径の式が変わったときの備えとして残す。
+    """
     d, margin = derive(spec), float(spec.plate.margin)
     od, screw = float(spec.tube.od), lookup_screw(spec.flange.bolt)
     bolts, tubes = flange_bolt_points(spec), tube_points(spec)

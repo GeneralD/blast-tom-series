@@ -26,6 +26,25 @@ def test_the_key_socket_check_is_part_of_issues():
 
 
 @pytest.mark.parametrize("label, values, fragment", [
+    ("受金・ラグの個数の上限（spacing）", {"lug.count": 26, "hoop.ear.count": 26}, "隣どうしで重なる"),
+    ("内リングの掛かり（hoop_seat）", {"hoop.seat": 12}, "hoop.seat が環の肉厚を超える"),
+    ("先端クランプのボルトの頭（tip_bolts_clear）", {"tube.gap_ratio": 0.1}, "先端クランプのボルトの頭が管に当たる"),
+    ("ボルトが届かない（bolt_lengths）", {"flange.bolt_length": 5}, "ヘッダープレートに届かない"),
+    ("ボルトが突き抜ける（bolt_lengths）", {"flange.bolt_length": 60}, "ヘッダープレートを突き抜ける"),
+    ("ラグの円盤が薄い（lug_fits）", {"lug.body_dia": 5}, "ラグの円盤の径がロッドの穴径以下"),
+    ("腕の下でボルトを抜けない（flange_bolts_removable）", {"shell.plenum_height": 40, "pad.height": 30}, "下でフランジのボルトを抜けない"),
+])
+def test_each_check_is_composed_into_issues(label, values, fragment):
+    """`issues()` に呼び出しを書き忘れる・消すと、単体テストは通ったまま build だけが効かなくなる。合成の側でも 1 件ずつ見張る
+    （差し口は `test_the_key_socket_check_is_part_of_issues`）。`flange_bolts_removable` は他の fatal が 1 つでもあれば走らないので、
+    ここでは他の fatal を出さない値で起こす。"""
+    found = _fatal(override(SPEC, **values))
+    assert any(fragment in w for w in found), (label, found)
+    if "ボルトを抜けない" in fragment:
+        assert all(fragment in w for w in found), found
+
+
+@pytest.mark.parametrize("label, values, fragment", [
     ("管同士の干渉", {"tube.gap_ratio": 0}, "干渉"),
     ("板径が大きすぎる", {"tube.od": 50.8, "tube.gap_ratio": 1.0}, "大きすぎる"),
     ("ボルト穴の肉不足（管外面）", {"flange.bolt_phase": 0, "flange.bolt_seat": 3}, "管外面"),
