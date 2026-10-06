@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 import pytest
-from drumcad.dims import Source
+from drumcad.dims import Source, design
 from gatling.params import SPEC, override
 from gatling.strength import G, root_load
 
@@ -46,3 +47,20 @@ def test_the_values_follow_the_leaves_and_inherit_the_provisional_source():
     longer = root_load(override(SPEC, arm__rear=200, load__mass=12))
     assert float(longer.moment) == pytest.approx(12 * G * 200 / 2)
     assert root_load(SPEC).moment.source is Source.PROVISIONAL            # 質量・後ろの長さが仮なので、導出値も仮（derived_from）
+
+
+def test_each_value_is_provisional_only_through_the_leaves_it_actually_uses():
+    """全指標に同じ入力を渡すと、無関係な仮値（load.mass・arm.rear）に断面係数やせん断力まで引きずられて仮になる。"""
+    load = root_load(SPEC)
+    assert load.section_modulus.source is not Source.PROVISIONAL                      # 管径・肉厚は確定
+    assert load.lever.source is Source.PROVISIONAL and load.moment.source is Source.PROVISIONAL     # arm.rear は仮
+    assert load.shear.source is Source.PROVISIONAL                                    # load.mass は仮
+
+    rear_only = root_load(replace(SPEC, load=replace(SPEC.load, mass=design(10))))
+    assert rear_only.shear.source is not Source.PROVISIONAL and rear_only.shear_impact.source is not Source.PROVISIONAL
+    assert rear_only.section_modulus.source is not Source.PROVISIONAL
+    assert rear_only.lever.source is Source.PROVISIONAL                               # lever は arm.rear に依存する
+
+    mass_only = root_load(replace(SPEC, arm=replace(SPEC.arm, rear=design(160))))
+    assert mass_only.lever.source is not Source.PROVISIONAL
+    assert mass_only.section_modulus.source is not Source.PROVISIONAL and mass_only.shear.source is Source.PROVISIONAL

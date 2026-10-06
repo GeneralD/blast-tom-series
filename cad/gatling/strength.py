@@ -47,21 +47,23 @@ def root_load(spec: GatlingSpec) -> RootLoad:
     modulus = math.pi * (od ** 4 - (od - 2 * wall) ** 4) / (32 * od)
     width = float(spec.pad.width)
     weight = float(spec.load.mass) * G
-    inputs = {"load.mass": spec.load.mass, "load.impact": spec.load.impact, "arm.rear": spec.arm.rear,
-              "arm.pipe.od": spec.arm.pipe.od, "arm.pipe.thickness": spec.arm.pipe.thickness, "pad.width": spec.pad.width}
+    mass, rear, factor = {"load.mass": spec.load.mass}, {"arm.rear": spec.arm.rear}, {"load.impact": spec.load.impact}
+    pipe = {"arm.pipe.od": spec.arm.pipe.od, "arm.pipe.thickness": spec.arm.pipe.thickness}
+    pad = {"pad.width": spec.pad.width}
+    moment_leaves = mass | rear                      # モーメント = 質量 × g × 距離 / 2。各結果は実際に使う葉だけを依存元にする
 
-    def make(value: float, note: str) -> Dim:
+    def make(value: float, note: str, inputs: dict) -> Dim:
         return derived_from(value, note, inputs)
 
     return RootLoad(
-        lever=make(lever, "ホルダーから胴の中心まで = arm.rear"),
-        moment=make(moment, "質量 × g × 距離 / 2"),
-        moment_impact=make(moment * impact, "質量 × g × 距離 / 2 × 衝撃係数"),
-        section_modulus=make(modulus, "π(D⁴ − d⁴) / (32 D)"),
-        pipe_stress=make(moment / modulus, "モーメント / 断面係数"),
-        pipe_stress_impact=make(moment * impact / modulus, "衝撃込みのモーメント / 断面係数"),
-        pad_edge_force=make(moment / width, "モーメント / 板幅（面内のねじりを左右の縁で受ける）"),
-        pad_edge_force_impact=make(moment * impact / width, "衝撃込みのモーメント / 板幅"),
-        shear=make(weight / 2, "質量 × g / 2"),
-        shear_impact=make(weight / 2 * impact, "質量 × g / 2 × 衝撃係数"),
+        lever=make(lever, "ホルダーから胴の中心まで = arm.rear", rear),
+        moment=make(moment, "質量 × g × 距離 / 2", moment_leaves),
+        moment_impact=make(moment * impact, "質量 × g × 距離 / 2 × 衝撃係数", moment_leaves | factor),
+        section_modulus=make(modulus, "π(D⁴ − d⁴) / (32 D)", pipe),
+        pipe_stress=make(moment / modulus, "モーメント / 断面係数", moment_leaves | pipe),
+        pipe_stress_impact=make(moment * impact / modulus, "衝撃込みのモーメント / 断面係数", moment_leaves | factor | pipe),
+        pad_edge_force=make(moment / width, "モーメント / 板幅（面内のねじりを左右の縁で受ける）", moment_leaves | pad),
+        pad_edge_force_impact=make(moment * impact / width, "衝撃込みのモーメント / 板幅", moment_leaves | factor | pad),
+        shear=make(weight / 2, "質量 × g / 2", mass),
+        shear_impact=make(weight / 2 * impact, "質量 × g / 2 × 衝撃係数", mass | factor),
     )
