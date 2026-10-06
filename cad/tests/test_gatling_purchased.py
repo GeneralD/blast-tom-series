@@ -35,16 +35,16 @@ def test_six_turret_lugs_are_discs_on_the_shell_each_with_a_vertical_bore_for_th
     box = _box(part)
     zc = (64.7905 + 94.7905) / 2                                                 # 円盤の中心の高さ（胴の取付穴の高さ）
     assert part.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((64.7905, 94.7905))
-    assert _inside(part, 90, 14, zc) and not _inside(part, 90, 15.5, zc)          # 円盤は φ30（r 15）
-    assert _inside(part, 90, 0, zc + 14) and not _inside(part, 90, 0, zc + 15.5)
+    assert _inside(part, 94, 14, zc) and not _inside(part, 94, 15.5, zc)          # 円盤は φ30（r 15）
+    assert _inside(part, 94, 0, zc + 14) and not _inside(part, 94, 0, zc + 15.5)
     assert _inside(part, 95.9, 0, zc) and not _inside(part, 96.1, 0, zc)          # 外側の面は胴の外面から 20（平面）
     assert _inside(part, 95.9, 14, zc) and not _inside(part, 96.1, 14, zc)        # 平面なので、縁でも同じ x
     assert not _inside(part, 75.9, 0, zc) and _inside(part, 76.1, 0, zc)          # 胴側は胴の外面で止まる
     assert not _inside(part, 75.8, 5, zc) and _inside(part, 76.3, 5, zc)          # 横にずれても胴に食い込まない（円で沿う）
-    assert not _inside(part, 86 + 2, 0, zc) and _inside(part, 86 + 3, 0, zc)      # ロッドの穴は φ5.5（r 2.75）
-    assert not _inside(part, 86, 0, zc + 14.9) and not _inside(part, 86, 0, 70.3)   # 穴は円盤の上端から軸の先まで開く
-    assert _inside(part, 86, 0, 70.0) and _inside(part, 86, 0, 65)                  # 軸の先より下は肉が残る（止まり穴）
-    assert _inside(part, 90, 0, zc + 10) and _inside(part, 90, 0, zc - 10)
+    assert not _inside(part, 87.75 + 2, 0, zc) and _inside(part, 87.75 + 3, 0, zc)      # ロッドの穴は φ5.5（r 2.75）
+    assert not _inside(part, 87.75, 0, zc + 14.9) and not _inside(part, 87.75, 0, 70.3)   # 穴は円盤の上端から軸の先まで開く
+    assert _inside(part, 87.75, 0, 70.0) and _inside(part, 87.75, 0, 65)                  # 軸の先より下は肉が残る（止まり穴）
+    assert _inside(part, 94, 0, zc + 10) and _inside(part, 94, 0, zc - 10)
     disc = math.pi * 15**2 * 20
     assert disc - math.pi * 2.75**2 * (94.7905 - 70.1905) < part.solids().vals()[0].Volume() < disc + 1000   # 円盤 + 胴の外面の円弧から出る三日月
 
@@ -52,7 +52,7 @@ def test_six_turret_lugs_are_discs_on_the_shell_each_with_a_vertical_bore_for_th
 def test_the_bore_is_through_only_when_the_rod_tip_sticks_out_below_the_disc():
     """軸の先が円盤の下端より下（警告になる設定）なら、穴は下端まで通る（穴の底を円盤の外に出さない）。"""
     long = lug(override(SPEC, lug__rod_length=70))
-    assert not _inside(long, 86, 0, 65) and not _inside(long, 86, 0, 94)
+    assert not _inside(long, 87.75, 0, 65) and not _inside(long, 87.75, 0, 94)
 
 
 def test_the_lugs_stand_round_about_the_shell_at_the_lug_angles():
@@ -60,8 +60,8 @@ def test_the_lugs_stand_round_about_the_shell_at_the_lug_angles():
     zc = (64.7905 + 94.7905) / 2
     for k in range(6):
         a = math.radians(60 * k)
-        assert _inside(part, 90 * math.cos(a), 90 * math.sin(a), zc), k
-        assert not _inside(part, 90 * math.cos(a + math.radians(30)), 90 * math.sin(a + math.radians(30)), zc), k
+        assert _inside(part, 94 * math.cos(a), 94 * math.sin(a), zc), k
+        assert not _inside(part, 94 * math.cos(a + math.radians(30)), 94 * math.sin(a + math.radians(30)), zc), k
 
 
 def test_the_lug_is_one_solid_per_lug_even_when_the_rod_sits_near_the_disc_edge():
@@ -74,7 +74,7 @@ def test_the_disc_follows_its_diameter_and_depth():
     zc = 94.7905 - 12
     assert _box(thick).zmin == pytest.approx(94.7905 - 24)                       # 上端は変わらず、下端は径ぶん
     assert _inside(thick, 105.9, 0, zc) and not _inside(thick, 106.1, 0, zc)
-    assert _inside(thick, 90, 0, zc + 11.5) and not _inside(thick, 90, 0, zc + 12.5)
+    assert _inside(thick, 95, 0, zc + 11.5) and not _inside(thick, 95, 0, zc + 12.5)
 
 
 def test_six_tension_rods_hang_from_the_ear_top_with_the_head_on_the_ear():
@@ -82,8 +82,8 @@ def test_six_tension_rods_hang_from_the_ear_top_with_the_head_on_the_ear():
     part = rod(SPEC)
     box = _box(part)
     assert part.solids().size() == 6 and (box.zmin, box.zmax) == pytest.approx((70.1905, 125.1905))
-    assert _inside(part, 86, 0, 100) and _inside(part, 86 + 2.7, 0, 100) and not _inside(part, 86 + 2.8, 0, 100)   # 軸
-    assert _inside(part, 86 + 4.4, 0, 125) and not _inside(part, 86 + 4.6, 0, 125)                                # 頭
+    assert _inside(part, 87.75, 0, 100) and _inside(part, 87.75 + 2.7, 0, 100) and not _inside(part, 87.75 + 2.8, 0, 100)   # 軸
+    assert _inside(part, 87.75 + 4.4, 0, 125) and not _inside(part, 87.75 + 4.6, 0, 125)                                # 頭
     assert part.solids().vals()[0].Volume() == pytest.approx(math.pi * (2.75**2 * 50 + 4.5**2 * 5), rel=1e-6)
     longer = _box(rod(override(SPEC, lug__rod_length=60)))
     assert (longer.zmin, longer.zmax) == pytest.approx((60.1905, 125.1905))     # 頭の位置は変わらず、先が下がる

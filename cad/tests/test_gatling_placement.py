@@ -145,10 +145,10 @@ def test_the_block_and_the_holder_stack_on_the_arm():
 
 def test_the_radii_nest_from_the_shell_out_to_the_pad_face():
     r = radii(SPEC)
-    assert r.shell == pytest.approx(76) and r.rod == pytest.approx(86)
+    assert r.shell == pytest.approx(76) and r.rod == pytest.approx(87.75)
     assert (r.hoop_in_inner, r.hoop_in_outer) == pytest.approx((76.7, 80.7))         # ヘッド外径 155.4 / 2 − 掛かり 1.0、肉厚 4
-    assert r.hoop_out_inner == pytest.approx(90.7)                                     # 管の内側の接線 = 内リングの外面 + 間隔 10
-    assert (r.hoop_out_centre, r.hoop_out_outer) == pytest.approx((103.4, 116.1))    # 管の中心・外面（φ25.4）
+    assert r.hoop_out_inner == pytest.approx(94.7)                                     # 管の内側の接線 = 内リングの外面 + 間隔 14
+    assert (r.hoop_out_centre, r.hoop_out_outer) == pytest.approx((107.4, 120.1))    # 管の中心・外面（φ25.4）
     assert r.hoop_in_outer < r.rod < r.hoop_out_inner                                  # ロッドはリングの間
     assert 152.4 / 2 < r.hoop_in_inner < 155.4 / 2                                     # 内リングはフレッシュフープの環の上に載る
     assert r.pad_outer == pytest.approx(78.5)                                          # 胴の外面 76 + 板厚 2.5
@@ -161,9 +161,9 @@ def test_the_collar_radius_is_half_the_head_diameter():
 def test_the_pipe_inner_surface_is_narrowest_at_the_pipe_centre_height():
     """管の内側（胴の軸の側）の面の半径。z の帯の中で最も軸に近い所を返し、帯が管に掛からなければ無限大。"""
     z = levels(SPEC)
-    assert pipe_inner_radius(SPEC, z.lug_bottom, z.ear_top) == pytest.approx(90.7)          # 管の中心の高さを含む
-    head = 103.4 - math.sqrt(12.7**2 - (z.ear_top - z.pipe_centre) ** 2)                      # 受金の上面（中心から 7.7 上）
-    assert pipe_inner_radius(SPEC, z.ear_top, z.rod_top) == pytest.approx(head)              # 93.30
+    assert pipe_inner_radius(SPEC, z.lug_bottom, z.ear_top) == pytest.approx(94.7)          # 管の中心の高さを含む
+    head = 107.4 - math.sqrt(12.7**2 - (z.ear_top - z.pipe_centre) ** 2)                      # 受金の上面（中心から 7.7 上）
+    assert pipe_inner_radius(SPEC, z.ear_top, z.rod_top) == pytest.approx(head)              # 97.30
     assert pipe_inner_radius(SPEC, z.hoop_top, z.hoop_top + 10) == math.inf
     assert pipe_inner_radius(SPEC, z.lug_bottom, z.lug_top) == math.inf
 

@@ -21,11 +21,10 @@ from gatling.planar import origin_distance
 from gatling_overlap import overlaps
 
 
-def test_the_default_has_no_fatal_no_overlap_and_only_the_two_known_warnings():
-    """既定の警告は受金のロッド通し穴の径方向の肉（内側・外側）の 2 件だけ。リムを浅くしても増えない。"""
+def test_the_default_has_no_fatal_no_overlap_and_no_warning():
+    """既定は警告も無い（溝を 14 に広げて、受金のロッド通し穴の径方向の肉が両側で板厚の半分以上になった。D-20）。"""
     found = issues(SPEC)
-    assert fatal_count(found) == 0
-    assert sorted(i.what.split("（")[0] for i in found) == ["受金のロッド通し穴の内側の肉", "受金のロッド通し穴の外側の肉"]
+    assert fatal_count(found) == 0 and found == []
     assert overlaps(SPEC) == []
 
 
@@ -155,11 +154,11 @@ def _dist_to_rect(p, u0, u1, v0, v1):
 
 def test_a_pad_swung_onto_a_tension_rod_hits_the_rod_exactly_when_the_rod_circle_reaches_the_pad_edge():
     """当て板（既定の上下 27〜87）はロッドの軸の高さ（先端 70.2〜頭の上面）と重なる。ロッドは半径 rod の円周上の、半径 rod_r の円。
-    既定の板厚 2.5 では板の外面（78.5）がロッドの縁（83）に届かないので、板厚を 8 にして外面を 84 に出す。
+    既定の板厚 2.5 では板の外面（78.5）がロッドの縁（85）に届かないので、板厚を 10 にして外面を 86 に出す。
     当て板の局所座標（u: 板の方位、v: それに直交）でロッドの中心から矩形までの距離が rod_r になる方位がちょうど。"""
     from gatling.fasteners import lookup_rod
     from gatling.placement import pad_plan
-    base = override(SPEC, pad__thickness=8)
+    base = override(SPEC, pad__thickness=10)
     rod_r, r = float(lookup_rod(base.lug.thread)) / 2, radii(base)
     u0, u1, v0, v1 = pad_plan(base)
 

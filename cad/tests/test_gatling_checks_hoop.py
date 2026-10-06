@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from gatling.checks import aligned, ear_fits, hoop_seat, lug_fits, rod_fits, spacing
+from gatling.checks import aligned, ear_fits, hoop_seat, key_socket_fits, lug_fits, rod_fits, spacing
 from gatling.params import SPEC, override
-from gatling.placement import levels
+from gatling.placement import levels, pipe_inner_radius, radii
 
 
 def _fatal(issues):
@@ -35,10 +35,10 @@ def test_a_rod_that_does_not_clear_the_inner_ring_is_fatal():
 
 
 def test_a_ring_gap_too_narrow_for_the_rod_is_fatal():
-    """外側の相手は外リングの管の内側の接線（内リングの外面 80.7 + 間隔）。ロッド中心 86 + 2.75 が収まる最小の間隔は 8.05。"""
+    """外側の相手は外リングの管の内側の接線（内リングの外面 80.7 + 間隔）。ロッド中心 87.75 + 2.75 が収まる最小の間隔は 9.8。"""
     assert any("外リング（管）" in w for w in _fatal(rod_fits(override(SPEC, hoop__gap=4))))
-    assert any("外リング（管）" in w for w in _fatal(rod_fits(override(SPEC, hoop__gap=8.0))))
-    assert _fatal(rod_fits(override(SPEC, hoop__gap=8.1))) == []
+    assert any("外リング（管）" in w for w in _fatal(rod_fits(override(SPEC, hoop__gap=9.7))))
+    assert _fatal(rod_fits(override(SPEC, hoop__gap=9.9))) == []
 
 
 def test_the_rod_shaft_must_thread_into_the_lug_by_the_engagement():
@@ -78,16 +78,16 @@ def test_the_rod_head_top_sits_exactly_at_the_hoop_top_so_it_never_warns_about_t
 
 
 def test_the_rod_head_must_clear_the_inner_ring():
-    """頭 φ9 の中心 r 86。内縁 86 − 径 / 2 が内リングの外面 80.7 を割ると当たる（径 10.6 まで）。"""
-    assert any("頭" in w and "内リング" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=10.7))))
-    assert not any("頭" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=10.6))))
+    """頭 φ9 の中心 r 87.75。内縁 87.75 − 径 / 2 が内リングの外面 80.7 を割ると当たる（径 14.1 まで）。"""
+    assert any("頭" in w and "内リング" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=14.2))))
+    assert not any("頭" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=14.1))))
 
 
 def test_the_rod_head_must_clear_the_pipe():
-    """standoff 11.5 でロッド中心 87.5。頭の高さ（受金の上面 120.19 から上）での管の内面は 93.30 なので、頭の径は 11.60 まで。"""
-    out = {"lug.standoff": 11.5}
-    assert any("頭" in w and "外リング（管）" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=11.7, **out))))
-    assert not any("頭" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=11.5, **out))))
+    """standoff 15 でロッド中心 91。頭の高さ（受金の上面 120.19 から上）での管の内面は 97.30 なので、頭の径は 12.60 まで。"""
+    out = {"lug.standoff": 15}
+    assert any("頭" in w and "外リング（管）" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=12.7, **out))))
+    assert not any("頭" in w for w in _fatal(rod_fits(override(SPEC, lug__rod_head_dia=12.5, **out))))
 
 
 def test_a_rod_head_no_larger_than_the_ear_hole_falls_through():
@@ -112,13 +112,13 @@ def test_the_mounting_hole_must_fall_inside_the_disc():
 
 
 def test_the_rod_must_pass_inside_the_disc_depth():
-    """ロッドの通る位置（胴の外面から standoff 10、ロッドの半径 2.75）が円盤の厚み depth 20 の中。外縁 12.75 を超えると円盤の外面から出る。"""
+    """ロッドの通る位置（胴の外面から standoff 11.75、ロッドの半径 2.75）が円盤の厚み depth 20 の中。外縁 14.5 を超えると円盤の外面から出る。"""
     assert lug_fits(SPEC) == []
-    assert any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__depth=12.7))))
+    assert any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__depth=14.4))))
     assert any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__standoff=17.3))))
-    assert not any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__depth=12.8))))
+    assert not any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__depth=14.5))))
     assert not any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__standoff=17.2))))
-    assert any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__thread="M5", lug__depth=12.4))))      # M5 は φ5、外縁 12.5
+    assert any("厚み" in w for w in _fatal(lug_fits(override(SPEC, lug__thread="M5", lug__depth=14.2))))      # M5 は φ5、外縁 14.25
 
 
 def test_the_disc_must_leave_a_wall_around_the_rod_bore():
@@ -159,25 +159,26 @@ def test_a_thin_wall_beside_the_rod_hole_is_only_a_warning():
 
 
 def test_the_ear_walls_beside_the_rod_hole_are_fatal_when_the_hole_breaks_out_of_the_plate():
-    """肉 = 内側は (ロッド − 穴径 / 2) − 内リングの外面（80.7）、外側は受金の z 帯 [114.19, 120.19] での管の内面（90.81）− (ロッド + 穴径 / 2)。
-    穴の半径 3.25。ロッドの半径 = 76 + standoff。内側は 84 で 0.05、83.9 で負。外側は 87.5 で 0.06、87.6 で負。"""
+    """肉 = 内側は (ロッド − 穴径 / 2) − 内リングの外面（80.7）、外側は受金の z 帯 [114.19, 120.19] での管の内面（94.81）− (ロッド + 穴径 / 2)。
+    穴の半径 3.25。ロッドの半径 = 76 + standoff。内側は 84 で 0.05、83.9 で負。外側は 91.5 で 0.06、91.6 で負。"""
     assert any("内側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=7.9))))
     assert not any("内側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=8.0))))
-    assert any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.6))))
-    assert not any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.5))))
-    assert any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=11.7))))        # 穴が受金の外端（管の切り欠き）を破る
+    assert any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=15.6))))
+    assert not any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=15.5))))
+    assert any("外側" in w for w in _fatal(ear_fits(override(SPEC, lug__standoff=15.7))))        # 穴が受金の外端（管の切り欠き）を破る
 
 
 def test_a_thin_radial_wall_beside_the_rod_hole_is_only_a_warning():
-    """径方向の肉は、穴の両側が溶接でリングに支えられるので、板厚（6）の半分の 3 mm を目安にする。既定は内側 2.05・外側 1.56 で警告。
-    リングの間（gap）を 4 広げ、ロッドを 1 外へ寄せると、内側 3.05・外側 4.47 で無警告。"""
-    found = ear_fits(SPEC)
-    assert not _fatal(found) and any("内側" in i.what for i in found) and any("外側" in i.what for i in found)
-    wide = float(SPEC.hoop.gap) + 4
-    assert ear_fits(override(SPEC, lug__standoff=11, hoop__gap=wide)) == []
-    assert any("内側" in i.what for i in ear_fits(override(SPEC, lug__standoff=10.9, hoop__gap=wide)))      # 2.95
-    assert ear_fits(override(SPEC, lug__standoff=12.5, hoop__gap=wide)) == []                               # 外側 3.06
-    assert any("外側" in i.what for i in ear_fits(override(SPEC, lug__standoff=12.6, hoop__gap=wide)))      # 外側 2.96
+    """径方向の肉は、穴の両側が溶接でリングに支えられるので、板厚（6）の半分の 3 mm を目安にする。既定（standoff 11.75）は両側 3.8 で無警告。
+    内側の肉 = standoff − 8.95 は 10.95 で 3.0、外側の肉 = 15.56 − standoff は 12.56 で 3.0（溝を 10 → 14 に広げた理由の 1 つ）。"""
+    assert ear_fits(SPEC) == []
+    assert ear_fits(override(SPEC, lug__standoff=10.95)) == [] and ear_fits(override(SPEC, lug__standoff=12.5)) == []
+    found = ear_fits(override(SPEC, lug__standoff=10.9))
+    assert not _fatal(found) and any("内側" in i.what for i in found) and not any("外側" in i.what for i in found)       # 内側 2.95
+    found = ear_fits(override(SPEC, lug__standoff=12.6))
+    assert not _fatal(found) and any("外側" in i.what for i in found) and not any("内側" in i.what for i in found)       # 外側 2.96
+    narrow = ear_fits(override(SPEC, hoop__gap=10, lug__standoff=10))                                                    # 旧い溝 10: 内側 2.05・外側 1.56
+    assert any("内側" in i.what for i in narrow) and any("外側" in i.what for i in narrow)
 
 
 def test_too_many_ears_and_lugs_run_into_each_other():
@@ -229,3 +230,37 @@ def test_an_ear_that_does_not_reach_the_pipe_is_fatal():
     assert not any("届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=5.1))))
 
 
+
+
+def test_the_default_key_socket_fits_between_the_rings():
+    """ドラムキーの差し口（既定 φ13）を頭に被せた円が、内リングの外面と頭の高さでの管の内面の間に収まる。"""
+    assert float(SPEC.lug.key_socket_dia) == 13
+    assert key_socket_fits(SPEC) == []
+
+
+def test_the_key_socket_must_clear_the_inner_ring_exactly_at_the_edge():
+    """内縁 = ロッド中心 − 差し口の半径。内リングの外面に縁ちょうどで通り、少し越えると fatal。"""
+    r = radii(SPEC)
+    exact = 2 * (r.rod - r.hoop_in_outer)
+    assert key_socket_fits(override(SPEC, lug__key_socket_dia=exact)) == []
+    found = _fatal(key_socket_fits(override(SPEC, lug__key_socket_dia=exact + 0.1)))
+    assert any("内リング" in w for w in found) and not any("管" in w for w in found)
+
+
+def test_the_key_socket_must_clear_the_pipe_exactly_at_the_edge():
+    """外縁 = ロッド中心 + 差し口の半径。頭の高さ（受金の上面から頭の上面）での管の内面に縁ちょうどで通り、少し越えると fatal。"""
+    z, wide = levels(SPEC), override(SPEC, lug__standoff=15)           # ロッドを外へ寄せ、外側が先に詰まるようにする（中心 91）
+    exact = 2 * (pipe_inner_radius(wide, z.ear_top, z.rod_top) - radii(wide).rod)
+    assert key_socket_fits(override(wide, lug__key_socket_dia=exact)) == []
+    found = _fatal(key_socket_fits(override(wide, lug__key_socket_dia=exact + 0.1)))
+    assert any("管" in w for w in found) and not any("内リング" in w for w in found)
+
+
+def test_the_old_ten_millimetre_gap_cannot_take_the_key_socket():
+    """溝 10 では差し口 φ13 が入らない（これが溝を 14 に広げた理由）。"""
+    assert any("差し口" in w for w in _fatal(key_socket_fits(override(SPEC, hoop__gap=10, lug__standoff=10))))
+
+
+def test_the_default_ear_walls_beside_the_rod_hole_are_both_at_least_half_the_plate_thickness():
+    """既定の受金の穴の両側の肉は、板厚の半分（3 mm）以上で、警告が出ない。"""
+    assert ear_fits(SPEC) == []

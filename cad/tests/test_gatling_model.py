@@ -63,7 +63,7 @@ def test_override_through_the_model_moves_the_name_the_parts_and_the_derived_val
 
 
 def test_the_default_spec_is_provisional_so_the_output_would_be_suffixed(gatling):
-    assert len(unsettled(gatling.spec)) == 35       # D-22 で当て板の板厚・腕の曲げ半径と長さ（3）・ブロック（3）・グリップ（3）・つまみ（2）・質量（1）が入り（+13）、グリップ丸棒の径（cradle.grip_dia）が消えた（−1）。それ以前: D-20 でリムの高さ・肉厚とロッドの頭の径・高さ（4 件）、D-21 でラグの取付ピッチが消え円盤の径・厚み（2 件）が入り、高さ（lug.height）が円盤の径に統合されて消えた（−1）
+    assert len(unsettled(gatling.spec)) == 36       # D-20 の溝 14 でドラムキーの差し口の外径（lug.key_socket_dia、+1）。D-22 で当て板の板厚・腕の曲げ半径と長さ（3）・ブロック（3）・グリップ（3）・つまみ（2）・質量（1）が入り（+13）、グリップ丸棒の径（cradle.grip_dia）が消えた（−1）。それ以前: D-20 でリムの高さ・肉厚とロッドの頭の径・高さ（4 件）、D-21 でラグの取付ピッチが消え円盤の径・厚み（2 件）が入り、高さ（lug.height）が円盤の径に統合されて消えた（−1）
 
 
 def test_once_every_leaf_is_settled_nothing_is_provisional_and_every_derived_value_is_derived(gatling):

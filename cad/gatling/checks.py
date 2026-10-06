@@ -33,7 +33,7 @@ _POSITIVE = (
     "edge.angle", "edge.radius", "edge.height", "edge.width",
     "hoop.inner.thickness", "hoop.inner.height", "hoop.outer.od", "hoop.outer.thickness", "hoop.gap",
     "hoop.seat", "hoop.takeup", "hoop.ear.width", "hoop.ear.thickness",
-    "lug.body_dia", "lug.depth", "lug.standoff", "lug.hole_dia", "lug.rod_length", "lug.rod_head_dia", "lug.rod_head_height",
+    "lug.body_dia", "lug.depth", "lug.standoff", "lug.hole_dia", "lug.rod_length", "lug.rod_head_dia", "lug.rod_head_height", "lug.key_socket_dia",
     "tube.od", "tube.thickness", "tube.length",
     "clamp.tip_thickness", "clamp.mid_thickness", "clamp.bolt_length",
     "header.thickness", "flange.thickness", "flange.bolt_seat", "flange.bolt_length", "plate.margin", "gasket.thickness",
@@ -211,6 +211,18 @@ def rod_fits(spec: GatlingSpec) -> list[Issue]:
     return found + at_most("ロッドの頭がフープの上端より上に出て、リムショットの邪魔になる", z.rod_top, z.hoop_top, fatal=False)
 
 
+def key_socket_fits(spec: GatlingSpec) -> list[Issue]:
+    """ドラムキーの差し口がロッドの頭に被さる（fatal）。
+
+    差し口を頭に被せた円（中心 = ロッド中心、半径 = `lug.key_socket_dia` / 2）が、頭の z の帯（受金の上面から頭の上面）で、
+    内リングの外面と管の内面（その帯での `pipe_inner_radius`）の間に収まる。縁ちょうどは通す。
+    """
+    r, z, socket = radii(spec), levels(spec), float(spec.lug.key_socket_dia) / 2
+    return (at_least("ドラムキーの差し口が内リングに当たる（差し口の内縁 < 内リングの外面）", r.rod - socket, r.hoop_in_outer)
+            + at_most("ドラムキーの差し口が外リング（管）に当たる（差し口の外縁 > 頭の高さでの管の内面）", r.rod + socket,
+                      pipe_inner_radius(spec, z.ear_top, z.rod_top)))
+
+
 def hoop_seat(spec: GatlingSpec) -> list[Issue]:
     """内リングがフレッシュフープの環の上面だけに載る（掛かりが環の肉厚を超えると、膜に載って膜を押す）。"""
     return at_most("内リングがフレッシュフープの内側まで掛かり、膜に載る（hoop.seat が環の肉厚を超える）",
@@ -377,7 +389,7 @@ def issues(spec: GatlingSpec) -> list[Issue]:
     found += plate_size(float(d.plate_od), float(d.shell_id), float(d.shell_od), float(spec.plate.max_over_shell))
     found += bolt_clearances(spec) + tubes_inside_bore(spec) + tube_clamps(spec) + tip_bolts_clear(spec)
     found += aligned(int(float(spec.tube.count)), int(float(spec.lug.count)), int(float(spec.hoop.ear.count)))
-    found += rod_fits(spec) + hoop_seat(spec) + ear_fits(spec) + spacing(spec) + lug_fits(spec) + bolt_lengths(spec)
+    found += rod_fits(spec) + key_socket_fits(spec) + hoop_seat(spec) + ear_fits(spec) + spacing(spec) + lug_fits(spec) + bolt_lengths(spec)
     found += mount_fits(spec)
     if not any(i.fatal for i in found):        # 配置が成り立たない値（折れた経路など）では平面形を作らない
         found += mount_clear(spec) + flange_bolts_removable(spec)

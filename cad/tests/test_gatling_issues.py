@@ -12,11 +12,10 @@ def _fatal(spec):
     return [i.what for i in issues(spec) if i.fatal]
 
 
-def test_the_default_spec_has_no_fatal_issue_and_only_the_two_known_radial_wall_warnings():
-    """既定の受金のロッド通し穴は、径方向の肉が内側 2.05・外側 1.47 で、目安（板厚の半分 = 3）に足りない（仕様 §5.3）。それ以外の警告は無い。"""
+def test_the_default_spec_has_no_fatal_issue_and_and_no_warning():
+    """既定の受金のロッド通し穴は、径方向の肉が両側 3.8 で、目安（板厚の半分 = 3）を満たす（溝 14、仕様 §5.3）。警告は無い。"""
     found = issues(SPEC)
-    assert fatal_count(found) == 0 and len(found) == 2
-    assert all("受金のロッド通し穴" in i.what and "径方向" in i.what for i in found)
+    assert fatal_count(found) == 0 and found == []
 
 
 @pytest.mark.parametrize("label, values, fragment", [
@@ -51,7 +50,7 @@ def test_a_plate_smaller_than_the_bore_is_caught_through_the_composed_check():
 
 def test_the_sweep_value_that_pushes_the_tubes_out_of_the_bore_warns_but_does_not_block():
     found = issues(override(SPEC, tube__gap_ratio=0.5))
-    assert fatal_count(found) == 0 and sum("はみ出" in i.what for i in found) == 1 and len(found) == 3     # 残りの 2 件は既定の受金の肉
+    assert fatal_count(found) == 0 and sum("はみ出" in i.what for i in found) == 1 and len(found) == 1
 
 
 def test_a_nonstandard_tube_warns_but_does_not_block():

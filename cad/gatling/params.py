@@ -82,6 +82,7 @@ class Lug:
     rod_length: Dim          # テンションロッドの軸の長さ（頭の下面から先端まで）
     rod_head_dia: Dim        # テンションロッドの頭の径（受金の上面に載る）
     rod_head_height: Dim
+    key_socket_dia: Dim      # ドラムキーの差し口の外径。頭に被せた円が内リングと管の間に収まる（`checks.key_socket_fits`）
 
 
 @dataclass(frozen=True)
@@ -239,7 +240,7 @@ SPEC = GatlingSpec(
     hoop=Hoop(
         inner=HoopRing(thickness=provisional(4, _RIM), height=provisional(8, _RIM)),
         outer=HoopPipe(od=design(25.4, _HOOP_PIPE), thickness=design(1.5, _HOOP_PIPE)),
-        gap=design(10, "ロッドとその頭が通る間隔（D-20）"),
+        gap=design(14, "ドラムキーの差し口が入り、受金の穴の両側に板厚の半分の肉が残る幅（D-20）"),
         seat=design(1.0, "フレッシュフープの上面に掛かる幅（環の肉厚 head.collar_wall の内側に収める。hoop_seat が見る）"),
         takeup=design(5, "チューニングでヘッドとフープを引き下ろす代"),
         ear=Ear(count=design(6, "ラグ数と同じ"), width=design(20), thickness=design(6),
@@ -251,11 +252,12 @@ SPEC = GatlingSpec(
         depth=provisional(20, _REAL),
         thread=Choice("#12-24", Source.PROVISIONAL, _REAL),
         count=design(6, "管の本数と方位を揃える"),
-        standoff=provisional(10, _REAL),
+        standoff=provisional(11.75, "置き値（実物を測るまで）"),
         hole_dia=provisional(5, _REAL),
         rod_length=provisional(50, _REAL),
         rod_head_dia=provisional(9, _REAL),
         rod_head_height=provisional(5, _REAL),
+        key_socket_dia=provisional(13, "一般的なドラムキーの差し口の外径。手持ちのキーを測るまで"),
     ),
     tube=Tube(
         count=design(6, "D-09"),
