@@ -123,3 +123,24 @@ def test_rediscovering_picks_up_a_submodule_rewritten_with_the_same_length_in_th
     params.write_text("LABEL = 'bbbb'\n", encoding="utf-8")       # 同じ長さ
     os.utime(params, ns=(stamp, stamp))                           # 同じ更新時刻 = .pyc の検証をすり抜ける
     assert discover(tmp_path)["twin"].name() == "bbbb"
+
+
+@pytest.mark.parametrize("statement", ["from .shapes import leaf", "from . import sibling"])
+def test_a_model_can_import_a_module_with_from_import_inside_its_package(tmp_path, statement):
+    """`from .sub import mod` と `from . import mod` は、親の名前空間まで import しにいく。"""
+    _write_model(tmp_path, "unused")
+    pkg = tmp_path / "twin"
+    (pkg / "shapes").mkdir()
+    (pkg / "shapes" / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / "shapes" / "leaf.py").write_text("LABEL = 'from-leaf'\n", encoding="utf-8")
+    (pkg / "sibling.py").write_text("LABEL = 'from-sibling'\n", encoding="utf-8")
+    module = statement.split()[-1]
+    init = pkg / "__init__.py"
+    init.write_text(
+        init.read_text(encoding="utf-8").replace(
+            "def name(spec): return 'unused'",
+            f"{statement}\ndef name(spec): return {module}.LABEL",
+        ),
+        encoding="utf-8",
+    )
+    assert discover(tmp_path)["twin"].name() == f"from-{module}"

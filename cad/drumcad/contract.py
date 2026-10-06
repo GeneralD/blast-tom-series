@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numbers
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
@@ -27,9 +28,16 @@ class PartInfo:
     made: Made                     # fabricated = 製作品、purchased = 既製品の簡略形状
     count: int = 1
     section: Section = "none"      # 2D 図面の切り方（PR 5 で使う）
-    explode: tuple[float, float, float] = (0.0, 0.0, 0.0)   # viewer の分解方向（単位ベクトル）
+    explode: tuple[float, float, float] = (0.0, 0.0, 0.0)   # viewer の分解の方向と相対距離（単位ベクトルではない。長さが分解の距離の比）
     standard: str = ""             # BOM「規格・型番の系統」。製作品の行は機種がここに書く
     dimensions: str = ""           # BOM「寸法」（例: φ38.1 × t1.2 × L450）。同上
+    opacity: float = 1.0           # viewer の不透明度（0 < opacity ≤ 1）。1 未満は半透明に描く。見た目だけで、形・質量・BOM には効かない
+
+    def __post_init__(self) -> None:
+        # 数値以外（文字列・None・複素数・bool）は比較が生の TypeError になるので先に弾く。
+        # nan は比較がすべて偽になるので、「範囲内」を肯定形で書いて弾く
+        if isinstance(self.opacity, bool) or not isinstance(self.opacity, numbers.Real) or not 0 < self.opacity <= 1:
+            raise ValueError(f"部品 {self.label} の opacity {self.opacity} は 0 より大きく 1 以下でなければならない")
 
 
 @dataclass(frozen=True)
@@ -39,7 +47,7 @@ class BomRow:
     name: str
     made: Made
     material: Material | None
-    standard: str          # 規格・型番の系統（例: DW タレットラグ、手すり用 #400 研磨管）
+    standard: str          # 規格・型番の系統（例: 丸形ラグ、手すり用 #400 研磨管）
     dimensions: str        # 例: φ38.1 × t1.2 × L450
     count: int
     part_number: str = ""

@@ -69,6 +69,12 @@ def _load(root: Path, name: str) -> ModuleType:
         qualname, init, loader=_FreshLoader(qualname, init), submodule_search_locations=[str(pkg_dir)]
     )
     module = importlib.util.module_from_spec(spec)
+    # `from .sub import leaf` は `__import__("<名前空間>.<機種>.sub.leaf")` を呼び、先頭の名前空間も
+    # import しようとする。空の親モジュールを置いておかないと、そこで ModuleNotFoundError になる
+    space = qualname.rpartition(".")[0]
+    if space not in sys.modules:
+        sys.modules[space] = ModuleType(space)
+        sys.modules[space].__path__ = []
     sys.modules[qualname] = module      # 相対 import が親を引けるよう、実行前に登録する
     finder = _FreshFinder(qualname)
     sys.meta_path.insert(0, finder)

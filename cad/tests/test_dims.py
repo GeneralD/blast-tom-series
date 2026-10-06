@@ -62,10 +62,10 @@ def _spec() -> _Spec:
 
 
 def test_a_choice_carries_a_value_and_a_source():
-    c = Choice("DW turret", Source.PROVISIONAL, "実物を測るまで")
-    assert c.value == "DW turret"
+    c = Choice("turret lug", Source.PROVISIONAL, "実物を測るまで")
+    assert c.value == "turret lug"
     assert c.source is Source.PROVISIONAL
-    assert repr(c) == "'DW turret' [仮 — 実物を測るまで]"
+    assert repr(c) == "'turret lug' [仮 — 実物を測るまで]"
 
 
 def test_walk_visits_dims_and_choices_by_attribute_path():
@@ -158,7 +158,7 @@ def test_a_dim_survives_a_pickle_round_trip(protocol):
 
 
 def test_a_choice_survives_deepcopy_and_pickle():
-    c = Choice("DW turret", Source.PROVISIONAL, "実物を測るまで")
+    c = Choice("turret lug", Source.PROVISIONAL, "実物を測るまで")
     assert copy.deepcopy(c) == c
     assert _round_trip(c) == c
 

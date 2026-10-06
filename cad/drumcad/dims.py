@@ -105,6 +105,19 @@ class Choice:
 
 Leaf = Dim | Choice
 
+
+def derived_from(value: float, note: str, inputs: Mapping[str, Leaf]) -> Dim:
+    """導出値。入力の葉に仮が 1 つでもあれば仮、無ければ導出（仕様 §5.2）。
+
+    `derived()` は入力を見ずに常に `Source.DERIVED` を返す（`Dim` の算術は素の float に落ちて
+    出典が消える）。そのまま使うと、仮のヘッドから導いた胴外径が確定に化ける。
+    """
+    pending = [path for path, leaf in inputs.items() if not leaf.source.is_settled]
+    if pending:
+        return provisional(value, f"{note}（仮の入力: {', '.join(pending)}）")
+    return derived(value, note)
+
+
 _SET_PATH = "{}"
 
 
