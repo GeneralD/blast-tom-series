@@ -58,6 +58,7 @@ def test_each_check_is_composed_into_issues(label, values, fragment):
     ("受金が内リングに溶接できない", {"hoop.inner.height": 5}, "溶接できない"),
     ("個数が整数でない", {"tube.count": 6.5}, "整数"),
     ("当て板がラグに当たる", {"pad.angle": 20}, "当て板がラグ"),
+    ("腕の頂点が一致する", {"arm.rear": 61.74999999999999}, "頂点が一致"),
     ("腕の曲げが折れる（脚が短い）", {"arm.rear": 130}, "後ろへの脚"),
     ("腕の曲げ半径が管の半径以下", {"arm.bend_radius": 5}, "掃引が折れる"),
     ("ホルダー受けが外リングに当たる", {"arm.rear": 120, "arm.bend_radius": 30}, "ホルダー受けが外リング"),

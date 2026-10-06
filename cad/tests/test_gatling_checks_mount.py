@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 from gatling.checks import bolt_lengths, mount_fits, stock_warning
 from gatling.params import SPEC, override
-from gatling.placement import arm_bends, grip_z, levels
+from gatling.placement import arm_bends, arm_vertices, grip_z, levels
 
 
 def _fatal(issues):
@@ -183,3 +183,13 @@ def test_an_arm_pipe_off_the_standard_sizes_is_only_a_warning():
 def test_a_pipe_with_no_bore_is_fatal_not_a_crash():
     found = _hits(mount_fits(override(SPEC, arm__pipe__thickness=12.7)), "穴が無い")
     assert len(found) == 1 and found[0].fatal
+
+
+def test_coincident_arm_vertices_are_fatal_before_any_bend_is_computed():
+    """`arm.rear` を最初の曲がりの頂点の y に合わせると、右の最初の曲がりと後ろの角が一致する（長さ 0）。`arm.rear` は正なので構造の検査を通るが、
+    `turn_angle()` が長さ 0 で割る。頂点から計算した値（丸めた 61.75 ではない）で起こす。"""
+    rear = -arm_vertices(SPEC)[1][1]
+    found = _fatal(mount_fits(override(SPEC, arm__rear=rear)))              # 例外にならない
+    assert any("頂点が一致" in w for w in found), found
+    assert not any("頂点が一致" in w for w in _fatal(mount_fits(SPEC)))
+    assert not any("頂点が一致" in w for w in _fatal(mount_fits(override(SPEC, arm__rear=rear + 1))))   # 少しずれれば一致ではない（脚の直線は別の検査）

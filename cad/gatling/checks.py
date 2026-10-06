@@ -23,7 +23,7 @@ from .derived import derive, shell_od
 from .fasteners import HOLDER_RODS, ROD_THREADS, lookup_holder, lookup_rod
 from .interference import ear_clear, flange_bolts_removable, mount_clear
 from .params import GatlingSpec
-from .placement import (arm_bends, ear_hole_dia, flange_bolt_points, grip_z, levels, lug_plan, pipe_inner_radius, radii, tip_bolt_points,
+from .placement import (arm_bends, arm_vertices, ear_hole_dia, flange_bolt_points, grip_z, levels, lug_plan, pipe_inner_radius, radii, tip_bolt_points,
                         tube_hole_dia, tube_points)
 
 MIN_ENGAGEMENT = 0.75         # ねじ込み長 / 呼び径の下限（下回ると警告）
@@ -329,7 +329,7 @@ def mount_fits(spec: GatlingSpec) -> list[Issue]:
     腕の曲げ半径は管の半径より大きく（小さいと掃引が折れる）、直線部が負にならない（曲げの接点が隣の曲げや当て板の内側に入ると
     経路が折れ返る）。曲げ半径が管の外径の 1.5 倍に足りなければ警告（手すり管の曲げの目安。冷間曲げで潰れ・シワが出やすい）。
     ブロックは後ろの直線部に収まり、腕の中心線より高く、ホルダー受けの本体はブロックの上面に収まって、ロッド径より太い。
-    グリップは角度が [0°, 90°) で、上端がフープの上端を超えない（リムショットの邪魔）。ホルダー受け（つまみを含む）の上端も同じ高さを超えれば警告（半径 140 以上の位置で邪魔にはならないので止めない）。
+    腕の隣り合う頂点が一致する（脚の長さ 0）ときは、曲げを計算せずここで返す。グリップは角度が [0°, 90°) で、上端がフープの上端を超えない（リムショットの邪魔）。ホルダー受け（つまみを含む）の上端も同じ高さを超えれば警告（半径 140 以上の位置で邪魔にはならないので止めない）。
     """
     pad, arm, block, mount, grip = spec.pad, spec.arm, spec.block, spec.mount, spec.grip
     z, od = levels(spec), float(arm.pipe.od)
@@ -339,6 +339,11 @@ def mount_fits(spec: GatlingSpec) -> list[Issue]:
             found.append(Issue(True, f"{what} {value:g}° は 0° 以上 90° 未満でなければならない"))
     if found:
         return found                       # 角度が外れた値では、後の配置（腕の経路・グリップの向き）が成り立たない
+    vertices = arm_vertices(spec)                # 左半分は右の鏡像なので、右から横渡しまでの 3 本の脚だけ見る
+    found = [Issue(True, f"腕の頂点が一致する（頂点 {i + 1} と {i + 2} の距離 {gap:g} ≤ {EPS:g}。arm.rear が最初の曲がりの位置に重なるなど）")
+             for i, gap in enumerate(math.dist(a, b) for a, b in zip(vertices[:4], vertices[1:4])) if gap <= EPS]
+    if found:
+        return found                       # 長さ 0 の脚は曲がり角（`turn_angle`）を長さ 0 で割る。曲げの計算・グリップの配置より先に止める
     if 2 * float(arm.pipe.thickness) >= od:
         found.append(Issue(True, f"腕の管の肉厚 {float(arm.pipe.thickness):g} が外径 {od:g} の半分以上で、穴が無い"))
     found += at_most("当て板が胴（プレナム）の高さに収まらない（板の高さ > プレナムの高さ）", float(pad.height), float(spec.shell.plenum_height))
