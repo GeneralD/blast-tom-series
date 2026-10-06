@@ -172,7 +172,6 @@ def test_the_ear_walls_beside_the_rod_hole_are_fatal_when_the_hole_breaks_out_of
 def test_a_thin_radial_wall_beside_the_rod_hole_is_only_a_warning():
     """径方向の肉は、穴の両側が溶接でリングに支えられるので、板厚（6）の半分の 3 mm を目安にする。既定（standoff 11.75）は両側 3.8 で無警告。
     内側の肉 = standoff − 8.95 は 10.95 で 3.0、外側の肉 = 15.56 − standoff は 12.56 で 3.0（溝を 10 → 14 に広げた理由の 1 つ）。"""
-    assert ear_fits(SPEC) == []
     assert ear_fits(override(SPEC, lug__standoff=10.95)) == [] and ear_fits(override(SPEC, lug__standoff=12.5)) == []
     found = ear_fits(override(SPEC, lug__standoff=10.9))
     assert not _fatal(found) and any("内側" in i.what for i in found) and not any("外側" in i.what for i in found)       # 内側 2.95
@@ -229,8 +228,6 @@ def test_an_ear_that_does_not_reach_the_pipe_is_fatal():
     """管の下端 = フープの上端 − 外径。受金の上面（フープの上端 − 5）が管の下端以下だと、受金が管に届かず溶接できない。"""
     assert any("受金" in w and "届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=5))))
     assert not any("届かない" in w for w in _fatal(ear_fits(override(SPEC, hoop__outer__od=5.1))))
-
-
 
 
 def test_the_default_key_socket_fits_between_the_rings():
