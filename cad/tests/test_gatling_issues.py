@@ -27,6 +27,7 @@ def test_the_key_socket_check_is_part_of_issues():
 
 @pytest.mark.parametrize("label, values, fragment", [
     ("受金・ラグの個数の上限（spacing）", {"lug.count": 26, "hoop.ear.count": 26}, "隣どうしで重なる"),
+    ("隣り合うフランジのボルトの頭（bolt_clearances）", {"flange.bolt_count": 55}, "ボルトの頭が重なる"),
     ("内リングの掛かり（hoop_seat）", {"hoop.seat": 12}, "hoop.seat が環の肉厚を超える"),
     ("先端クランプのボルトの頭（tip_bolts_clear）", {"tube.gap_ratio": 0.1}, "先端クランプのボルトの頭が管に当たる"),
     ("ボルトが届かない（bolt_lengths）", {"flange.bolt_length": 5}, "ヘッダープレートに届かない"),

@@ -65,6 +65,15 @@ def test_the_bolt_hole_to_plate_edge_distance_is_exactly_the_margin_by_construct
         assert not any("板縁" in w for w in _fatal(bolt_clearances(override(SPEC, flange__bolt_seat=seat))))
 
 
+def test_adjacent_flange_bolt_heads_must_not_overlap_at_the_boundary():
+    """隣り合う中心の弦 = ボルト円 × sin(180° / 本数) が頭径（M6 は 10）以上。54 本は約 10.001 で通り、55 本は約 9.82 で fatal。
+    `bolt_flange()` は頭が重なる solid をそのまま並べ、`overlaps()` は同じ部品内の solid を比べないので、ここでしか止まらない。"""
+    assert not any("頭が重なる" in w for w in _fatal(bolt_clearances(override(SPEC, flange__bolt_count=54))))
+    assert any("頭が重なる" in w for w in _fatal(bolt_clearances(override(SPEC, flange__bolt_count=55))))
+    assert not any("頭が重なる" in w for w in _fatal(bolt_clearances(SPEC)))
+    assert not any("頭が重なる" in w for w in _fatal(bolt_clearances(override(SPEC, flange__bolt_count=1))))    # 1 本は隣が無い
+
+
 def test_a_bolt_whose_head_overlaps_the_shell_wall_is_fatal():
     assert any("胴の外面" in w for w in _fatal(bolt_clearances(override(SPEC, flange__bolt_seat=2))))
 

@@ -124,7 +124,7 @@ def _angle_apart(a: float, b: float) -> float:
 
 
 def bolt_clearances(spec: GatlingSpec) -> list[Issue]:
-    """フランジのボルト穴: 管外面・板縁・胴への距離が縁以上、管の方位からずれている。
+    """フランジのボルト穴: 管外面・板縁・胴への距離が縁以上、隣どうしの頭が重ならない、管の方位からずれている。
 
     板縁の距離は恒真（fatal になる入力は作れない）: 板径は ボルト円 + 2 × 縁 以上に導かれる（`derive` の `plate_od`）。
     `plate_size` の下限と同じく、板径の式が変わったときの備えとして残す。
@@ -140,6 +140,10 @@ def bolt_clearances(spec: GatlingSpec) -> list[Issue]:
     found = (at_least("ボルト穴と管外面の距離が縁に足りない", to_tube, margin)
              + at_least("ボルト穴と板縁の距離が縁に足りない", to_edge, margin)
              + at_least("ボルトの頭が胴の外面にかかる（ボルト座が頭の半径に足りない）", to_shell, 0.0))
+    if len(bolts) >= 2:                      # 1 本は隣が無い
+        chord = float(d.bolt_circle) * math.sin(math.pi / len(bolts))
+        found += at_least(f"隣り合うフランジのボルトの頭が重なる（ボルト {len(bolts)} 本の中心間 {chord:.2f} < 頭径）",
+                          chord, float(screw.head_dia))
     if not shifted:
         found.append(Issue(True, f"フランジのボルトのどれかが管と同じ方位にある（bolt_phase = {float(spec.flange.bolt_phase):g}°、"
                                  f"ボルト {len(bolts)} 本（間隔 {360 / len(bolts):g}°）・管 {len(tubes)} 本（間隔 {pitch:g}°））"))
