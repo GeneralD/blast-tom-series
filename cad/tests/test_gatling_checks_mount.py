@@ -158,6 +158,22 @@ def test_a_grip_must_not_stand_above_the_rim():
     assert len(found) == 1 and found[0].fatal
 
 
+def test_the_holder_and_its_knob_must_not_stand_above_the_rim_but_it_is_only_a_warning():
+    """ホルダー受け（ブロックの上面 + 本体の高さ）とつまみの上端がフープの上端より上に出るなら警告（既定では 8.2 mm 余裕）。
+    リムショットの邪魔にならない位置（半径 140 以上）なので、止めはしない。"""
+    top = lambda s: levels(s).hoop_top
+    assert _hits(mount_fits(SPEC), "ホルダー受け") == []
+    edge = top(SPEC) - levels(SPEC).block_top                                          # 本体の高さの上限
+    assert _hits(mount_fits(override(SPEC, mount__body_height=edge)), "ホルダー受け") == []
+    found = _hits(mount_fits(override(SPEC, mount__body_height=edge + 0.01)), "ホルダー受け")
+    assert len(found) == 1 and not found[0].fatal
+    # つまみが本体より高くなる（径を太くして、軸は本体の高さの中心なので、上端 = 軸 + 半径）
+    centre = levels(SPEC).knob_centre
+    edge_knob = 2 * (top(SPEC) - centre)
+    assert _hits(mount_fits(override(SPEC, mount__knob_dia=edge_knob)), "ホルダー受け") == []
+    assert len(_hits(mount_fits(override(SPEC, mount__knob_dia=edge_knob + 0.02)), "ホルダー受け")) == 1
+
+
 def test_an_arm_pipe_off_the_standard_sizes_is_only_a_warning():
     found = stock_warning(override(SPEC, arm__pipe__od=30.0))
     assert len(found) == 1 and not found[0].fatal and "腕の管" in found[0].what and "規格径" in found[0].what

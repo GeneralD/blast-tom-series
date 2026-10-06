@@ -12,10 +12,11 @@ from gatling.checks import issues
 import math
 
 import pytest
-from gatling.interference import _round_parts, ear_clear, flange_bolts_removable, mount_bodies, mount_clear
+import gatling.interference as interference
+from gatling.interference import _round_parts, _tube_bundle, ear_clear, flange_bolts_removable, mount_bodies, mount_clear, Body
 from gatling.params import SPEC, override
 from gatling.fasteners import lookup_screw
-from gatling.placement import arm_polys, grip_polys, grip_z, levels, pad_polys
+from gatling.placement import arm_polys, block_plan, grip_polys, grip_z, holder_centre, levels, lug_angles, pad_polys, radii
 from gatling.planar import origin_distance
 from gatling_overlap import overlaps
 
@@ -142,3 +143,120 @@ def test_the_arm_over_a_flange_bolt_must_leave_room_to_pull_the_bolt():
 def test_a_bolt_clear_of_every_mount_part_needs_no_room():
     """ボルトを管の方位からずらしたまま動かし、腕の下に入らなければ、ボルトが長くても止めない。"""
     assert flange_bolts_removable(override(SPEC, flange__bolt_phase=0, flange__bolt_length=40)) == []
+
+
+# --- 突き合わせで見つかった穴（変異で落ちなかった項）。境界はどれも、検査と別の式で出す -----------------------------------------------
+
+
+def _dist_to_rect(p, u0, u1, v0, v1):
+    """点から矩形（u0..u1, v0..v1）までの最短距離（矩形の外では角・辺までの距離。検査の `_meet` とは別の式）。"""
+    return math.hypot(max(u0 - p[0], 0.0, p[0] - u1), max(v0 - p[1], 0.0, p[1] - v1))
+
+
+def test_a_pad_swung_onto_a_tension_rod_hits_the_rod_exactly_when_the_rod_circle_reaches_the_pad_edge():
+    """当て板（既定の上下 27〜87）はロッドの軸の高さ（先端 70.2〜頭の上面）と重なる。ロッドは半径 rod の円周上の、半径 rod_r の円。
+    既定の板厚 2.5 では板の外面（78.5）がロッドの縁（83）に届かないので、板厚を 8 にして外面を 84 に出す。
+    当て板の局所座標（u: 板の方位、v: それに直交）でロッドの中心から矩形までの距離が rod_r になる方位がちょうど。"""
+    from gatling.fasteners import lookup_rod
+    from gatling.placement import pad_plan
+    base = override(SPEC, pad__thickness=8)
+    rod_r, r = float(lookup_rod(base.lug.thread)) / 2, radii(base)
+    u0, u1, v0, v1 = pad_plan(base)
+
+    def distance(angle):
+        phi = math.radians(angle)               # 当て板の方位 −angle と、ロッド（方位 0°）の間の角
+        return _dist_to_rect((r.rod * math.cos(phi), r.rod * math.sin(phi)), u0, u1, v0, v1)
+
+    hit = lambda a: bool(_hits(mount_clear(override(base, pad__angle=a)), "当て板がロッドに当たる"))
+    edge = _edge(hit, 30.0, 0.0)
+    assert 0.0 < edge < 30.0
+    assert math.isclose(distance(edge), rod_r, abs_tol=0.01), (edge, distance(edge), rod_r)
+    assert 0 in lug_angles(SPEC)
+
+
+def _centroid(poly):
+    return (sum(x for x, _ in poly) / len(poly), sum(y for _, y in poly) / len(poly))
+
+
+@pytest.mark.parametrize("part, point, bottom, extra", [
+    ("当て板", lambda s: _centroid(pad_polys(s)[0]), lambda s, z: z.pad_bottom, {}),
+    ("スペードグリップ", lambda s: _centroid(grip_polys(s)[0]), lambda s, z: grip_z(s)[0], {"grip__drop": 0}),
+    ("ブロック", lambda s: holder_centre(s), lambda s, z: z.arm_centre, {}),
+    ("ホルダー受け", lambda s: holder_centre(s), lambda s, z: z.holder_bottom, {}),
+])
+def test_a_flange_bolt_under_each_mount_part_needs_room_to_be_pulled_exactly_to_that_parts_underside(monkeypatch, part, point, bottom, extra):
+    """ボルトの位置を各部品の真下に置き（頭の円がその部品の平面形に入る）、ボルト長を伸ばして、その部品の下端とフランジ上面の
+    距離がちょうど頭の高さ + ねじ込み長になるところで、その部品のぶんだけが切り替わる。他の部品（腕など）が同じ点の上にあっても、
+    見るのはその部品の名前のメッセージだけ。"""
+    base = override(SPEC, **extra)
+    z, screw = levels(base), lookup_screw(base.flange.bolt)
+    monkeypatch.setattr(interference, "flange_bolt_points", lambda spec: [point(spec)])
+    stack = float(base.flange.thickness) + float(base.gasket.thickness)
+    edge = (bottom(base, z) - z.flange_top) - float(screw.head_height) + stack
+    mine = lambda found: [i for i in found if i.what.startswith(f"{part}の下で")]
+    assert mine(flange_bolts_removable(override(base, flange__bolt_length=edge))) == []
+    found = mine(flange_bolts_removable(override(base, flange__bolt_length=edge + 0.01)))
+    assert len(found) == 1 and found[0].fatal
+
+
+def _synthetic(spec, radius, z0, z1, distance, monkeypatch):
+    """胴の軸から `distance` の所に半径 1 の円柱を、z の範囲 [z0, z1] に置いた 1 個の部品だけを相手にする。"""
+    body = Body("試験片", circles=((( distance + 1.0, 0.0), 1.0),), z=(z0, z1))
+    monkeypatch.setattr(interference, "mount_bodies", lambda s: [body])
+    return mount_clear(spec)
+
+
+def test_every_revolved_part_around_the_shell_is_a_counterpart_with_its_own_radius_and_z_band(monkeypatch):
+    """胴・エッジ環、フレッシュフープ、内リング、外リング（管）、受金、フランジ・ヘッダープレート、管束・クランプのどれも相手になり、
+    外半径の縁ちょうどは通り、少し食い込むと fatal。z の端が接するだけなら通り、少し重なると fatal。"""
+    parts = [*_round_parts(SPEC), _tube_bundle(SPEC)]
+    assert sorted(p[0] for p in parts) == sorted(["胴・エッジ環", "フレッシュフープ", "内リング", "外リング（管）", "受金",
+                                                  "フランジ・ヘッダープレート", "管束・クランプ"])
+    for name, radius, z0, z1 in parts:
+        mid = (z0 + z1) / 2
+        hit = lambda dist, a=mid, b=mid + 0.5: [i for i in _synthetic(SPEC, radius, a, b, dist, monkeypatch) if f"に食い込む" in i.what and name in i.what]
+        if name == "外リング（管）":
+            continue                      # 環（中が空き）なので、半径は内面〜外面の帯。下の専用のテストで見る
+        assert hit(radius) == [] and len(hit(radius - 0.01)) == 1, name
+        # z: 上端に接する（ちょうど）か、少し重なる
+        touch = [i for i in _synthetic(SPEC, radius, z1, z1 + 5, radius - 3.0, monkeypatch) if name in i.what and "食い込む" in i.what]
+        over = [i for i in _synthetic(SPEC, radius, z1 - 0.01, z1 + 5, radius - 3.0, monkeypatch) if name in i.what and "食い込む" in i.what]
+        assert touch == [] and len(over) == 1, name
+
+
+def test_the_outer_ring_is_an_annulus_so_a_part_inside_its_inner_face_does_not_touch_it(monkeypatch):
+    """外リング（管）は中が空いた環。半径で見ると内面〜外面の帯。内面より内側に収まる部品は、z が重なっても当たらない。
+    外へ伸びる部品は帯を横切るので当たる。"""
+    name, outer, z0, z1 = next(p for p in _round_parts(SPEC) if p[0] == "外リング（管）")
+    inner = radii(SPEC).hoop_out_inner
+    assert inner < outer
+    z = ((z0 + z1) / 2, (z0 + z1) / 2 + 0.5)
+
+    def hit(near, far):
+        body = Body("試験片", circles=(((( near + far) / 2, 0.0), (far - near) / 2),), z=z)
+        monkeypatch.setattr(interference, "mount_bodies", lambda s: [body])
+        return [i for i in mount_clear(SPEC) if name in i.what]
+
+    assert hit(inner - 20.0, inner) == []                    # 内面ちょうどまでなら当たらない
+    assert len(hit(inner - 20.0, inner + 0.01)) == 1         # 帯に少し入る
+    assert len(hit(inner - 20.0, outer + 10.0)) == 1         # 帯を横切る
+    assert hit(outer, outer + 10.0) == []                    # 外面ちょうどから外は当たらない
+    assert len(hit(outer - 0.01, outer + 10.0)) == 1
+
+
+def test_a_tall_pad_inside_the_outer_ring_is_not_a_false_positive():
+    """当て板の高さをプレナムの高さ（100）まで伸ばすと z は外リング（管）と重なるが、当て板は環の内面（103）より内側。
+    3D でも当たらない（`overlaps` は重い。ここでは検査の結果だけ）。"""
+    found = mount_clear(override(SPEC, pad__height=100))
+    assert [i for i in found if "外リング" in i.what] == []
+
+
+def test_a_knob_is_a_body_of_its_own_and_hits_the_block_when_it_grows_down(monkeypatch):
+    """つまみ（ホルダー受けの後ろへ出る円柱）は軸の高さ = ホルダー受けの高さの中心。つまみの径を太くすると下端が下がり、
+    ブロックの上面（= ホルダー受けの下面）に届いたところがちょうど。ホルダー受けの本体の円はブロックの上に載るだけで当たらない。"""
+    centre = levels(SPEC).knob_centre
+    top = levels(SPEC).block_top
+    edge = 2 * (centre - top)
+    hit = lambda d: [i for i in mount_clear(override(SPEC, mount__knob_dia=d)) if "ブロック" in i.what and "ホルダー受け" in i.what]
+    assert hit(edge) == []
+    assert len(hit(edge + 0.02)) == 1

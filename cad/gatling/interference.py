@@ -80,6 +80,10 @@ class Body:
             return self.reach
         return min([origin_distance(p) for p in self.polys] + [max(math.hypot(*c) - r, 0.0) for c, r in self.circles])
 
+    def farthest(self) -> float:
+        """胴の軸から、この部品の平面形までの最長距離（凸多角形は頂点、円は中心 + 半径）。中が空いた環（外リング）の内面を越えるかを見る。"""
+        return max([math.hypot(*v) for p in self.polys for v in p] + [math.hypot(*c) + r for c, r in self.circles])
+
 
 # 溶接で接する組は、形状が相手の外形で切って体積を共有しない（ブロックとグリップは腕の外形で切る。`shapes/mount.py`）。
 # ホルダー受けとつまみは 1 つの部品。当て板と腕は、腕が当て板の外面に平らな端で接するだけなので、免除せず平面の重なりで見る
@@ -120,9 +124,11 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
 
     z の範囲が重なり、かつ平面視でも重なれば干渉（fatal）。相手の平面形は形状と同じ placement の値から作る:
     胴まわりの回転体（胴・エッジ環、フレッシュフープ、フープ、フランジ・ヘッダープレート、管束とクランプ）は外半径の円
-    （中は空いていても、外から来る部品は外面で当たる）、ラグは `lug_plan`（円盤の矩形。相手の z の帯に入る薄片の幅）を `lug_angles` の
+    （外から来る部品は外面で当たる。ただし外リングの管は中が空いた環なので、内面〜外面の帯で見て、内面の内側に収まる当て板は
+    当たらない）、ラグは `lug_plan`（円盤の矩形。相手の z の帯に入る薄片の幅）を `lug_angles` の
     方位へ回した矩形、ロッドは半径 `rod` の円周上の円（軸の先から頭の上面まで）。
-    当て板の内面は胴の外面（半径 R）に沿うので、胴の軸からの距離は R として見る。
+    当て板の内面は胴の外面（半径 R）に沿うので、胴の軸からの距離は R として見る。当て板の角 R（`pad.corner`）は平面形に入れていない
+    （矩形で覆う）ので、ラグの円盤が板の丸めた角をかすめるだけの組も fatal にする（保守側）。
     """
     z, r = levels(spec), radii(spec)
     bodies = mount_bodies(spec)
@@ -136,7 +142,8 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
 
     for body in bodies:
         for name, radius, z0, z1 in [*_round_parts(spec), _tube_bundle(spec)]:
-            if z_overlap(z0, z1, *body.z) and body.nearest() < radius - EPS:
+            hollow = r.hoop_out_inner if name == "外リング（管）" else 0.0       # 管の環は内面〜外面の帯。内面の内側に収まる部品は当たらない
+            if z_overlap(z0, z1, *body.z) and body.nearest() < radius - EPS and body.farthest() > hollow + EPS:
                 report(f"{body.part}が{name}に食い込む（平面視で内縁 {body.nearest():.2f} < 外半径 {radius:.2f}、z も重なる）")
     rod_r = float(lookup_rod(spec.lug.thread)) / 2
     rod_z = (z.rod_tip, z.rod_top)

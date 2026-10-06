@@ -307,7 +307,7 @@ def mount_fits(spec: GatlingSpec) -> list[Issue]:
     腕の曲げ半径は管の半径より大きく（小さいと掃引が折れる）、直線部が負にならない（曲げの接点が隣の曲げや当て板の内側に入ると
     経路が折れ返る）。曲げ半径が管の外径の 1.5 倍に足りなければ警告（手すり管の曲げの目安。冷間曲げで潰れ・シワが出やすい）。
     ブロックは後ろの直線部に収まり、腕の中心線より高く、ホルダー受けの本体はブロックの上面に収まって、ロッド径より太い。
-    グリップは角度が [0°, 90°) で、上端がフープの上端を超えない（リムショットの邪魔）。
+    グリップは角度が [0°, 90°) で、上端がフープの上端を超えない（リムショットの邪魔）。ホルダー受け（つまみを含む）の上端も同じ高さを超えれば警告（半径 140 以上の位置で邪魔にはならないので止めない）。
     """
     pad, arm, block, mount, grip = spec.pad, spec.arm, spec.block, spec.mount, spec.grip
     z, od = levels(spec), float(arm.pipe.od)
@@ -340,6 +340,8 @@ def mount_fits(spec: GatlingSpec) -> list[Issue]:
     found += at_least("ホルダー受けの本体の径がロッド径に足りず、ロッドの穴が通らない", float(mount.body_dia),
                       float(lookup_holder(mount.type)) + EPS)
     found += at_most("グリップの上端がフープの上端より上に出て、リムショットの邪魔になる", grip_z(spec)[1], z.hoop_top)
+    kr = float(mount.knob_dia) / 2
+    found += at_most("ホルダー受け（つまみを含む）の上端がフープの上端より上に出る", max(z.holder_top, z.knob_centre + kr), z.hoop_top, fatal=False)
     return found
 
 
