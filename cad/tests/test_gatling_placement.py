@@ -251,7 +251,7 @@ def test_the_spade_grips_start_in_the_middle_of_the_rear_bends_and_point_down_ba
     right, left = grip_poses(SPEC)
     d = right.direction
     assert math.hypot(*d) == pytest.approx(1) and d[2] == pytest.approx(-0.5)                  # 下へ 30°
-    assert d[0] == pytest.approx(math.sin(math.radians(15)) * math.cos(math.radians(30))) and d[1] < 0
+    assert d[0] == pytest.approx(math.sin(math.radians(10)) * math.cos(math.radians(30))) and d[1] < 0
     assert left.direction == pytest.approx((-d[0], d[1], d[2])) and left.start == pytest.approx((-right.start[0], right.start[1], right.start[2]))
     cx, cy = -50.8 + 123.5 * math.cos(math.radians(30)), -160 + 50.8
     assert right.start[:2] == pytest.approx((cx + 50.8 * math.cos(math.pi / 4), cy - 50.8 * math.sin(math.pi / 4)))   # 円弧の中央

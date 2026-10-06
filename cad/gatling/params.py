@@ -296,7 +296,7 @@ SPEC = GatlingSpec(
     ),
     grip=Grip(
         length=provisional(110, "viewer で握りを見て決める"), drop=provisional(30, "viewer で握りを見て決める"),
-        out=provisional(15, "viewer で握りを見て決める"), cap=design(3, "溶接の端板"),
+        out=provisional(10, "viewer で握りを見て決める。上から見た幅が旧クレードル（246）を超えない範囲（D-22）"), cap=design(3, "溶接の端板"),
     ),
     mount=Mount(
         type=Choice("L ロッド 12.7", Source.PROVISIONAL, "手持ちのホルダーに合わせる"),

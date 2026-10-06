@@ -107,6 +107,6 @@ def test_the_mount_is_welded_pads_with_a_u_shaped_pipe_arm_and_has_no_cradle_or_
     assert (float(s.arm.pipe.od), float(s.arm.pipe.thickness)) == (float(s.hoop.outer.od), float(s.hoop.outer.thickness))   # 外リングと同じ管
     assert (float(s.arm.bend_radius), float(s.arm.stub), float(s.arm.rear)) == (50.8, 45, 160)
     assert float(s.arm.bend_radius) == 2 * float(s.arm.pipe.od)                                                      # 管径の 2 倍
-    assert (float(s.grip.length), float(s.grip.drop), float(s.grip.out), float(s.grip.cap)) == (110, 30, 15, 3)
+    assert (float(s.grip.length), float(s.grip.drop), float(s.grip.out), float(s.grip.cap)) == (110, 30, 10, 3)
     assert (float(s.block.width), float(s.block.depth), float(s.block.height)) == (60, 50, 30)
     assert leaves["pad.thickness"].source is Source.PROVISIONAL and leaves["pad.width"].source is Source.DESIGN

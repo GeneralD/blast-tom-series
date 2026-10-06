@@ -26,11 +26,20 @@ def test_the_pipe_stress_comes_from_the_section_modulus_of_the_arm_pipe():
     assert float(load.pipe_stress_impact) < 205 / 3                                                            # SUS304 の耐力（約 205 MPa）の 1/3 に収まる
 
 
-def test_the_pad_edge_couple_is_the_moment_over_the_pad_height():
+def test_the_pad_edge_couple_is_the_in_plane_moment_over_the_pad_width():
+    """ホルダーは当て板の中心から半径方向にほぼ揃うので、当て板のモーメントは板の面内のねじり。偶力は左右（周方向）の縁の間、板幅で受ける。"""
     load = root_load(SPEC)
-    assert float(load.pad_edge_force) == pytest.approx(float(load.moment) / 60)           # 約 131 N
+    assert float(load.pad_edge_force) == pytest.approx(float(load.moment) / 40)           # 約 196 N
     assert float(load.pad_edge_force_impact) == pytest.approx(3 * float(load.pad_edge_force))
-    assert float(root_load(override(SPEC, pad__height=30)).pad_edge_force) == pytest.approx(2 * float(load.pad_edge_force))
+    assert float(root_load(override(SPEC, pad__width=20)).pad_edge_force) == pytest.approx(2 * float(load.pad_edge_force))
+    assert float(root_load(override(SPEC, pad__height=30)).pad_edge_force) == pytest.approx(float(load.pad_edge_force))     # 高さには依らない
+
+
+def test_the_vertical_shear_at_each_root_is_half_the_weight():
+    load = root_load(SPEC)
+    assert float(load.shear) == pytest.approx(10 * G / 2) and float(load.shear) == pytest.approx(49.03, abs=0.01)
+    assert float(load.shear_impact) == pytest.approx(3 * float(load.shear))
+    assert float(root_load(override(SPEC, load__mass=20)).shear) == pytest.approx(2 * float(load.shear))
 
 
 def test_the_values_follow_the_leaves_and_inherit_the_provisional_source():

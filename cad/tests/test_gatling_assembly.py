@@ -131,3 +131,13 @@ def test_the_head_is_drawn_red_and_half_transparent_and_every_other_part_stays_o
     assert info["head"].color == "#d0121b" and info["head"].opacity == 0.5
     assert {k for k, v in info.items() if v.opacity != 1.0} == {"head"}
     assert info["head"].standard == SPEC.head.model.value and info["head"].made == "purchased"
+
+
+# 旧クレードル（D-06、ab09721 の形）の外形。包含箱を測った値。新しい架台は、決定の動機（上から見た大きさ）に反して広がってはならない
+OLD_CRADLE_X_WIDTH = 246.0
+OLD_CRADLE_Y_LENGTH = 380.0
+
+
+def test_the_footprint_seen_from_above_is_not_wider_or_longer_than_the_old_cradle(built):
+    box = cq.Compound.makeCompound([s for p in built.values() for s in p.solids().vals()]).BoundingBox()
+    assert box.xlen <= OLD_CRADLE_X_WIDTH and box.ylen <= OLD_CRADLE_Y_LENGTH, (box.xlen, box.ylen)
