@@ -69,6 +69,15 @@ def test_a_zero_tube_count_stops_as_a_fatal_not_as_an_exception(tmp_path, monkey
     assert list(tmp_path.iterdir()) == []
 
 
+@pytest.mark.parametrize("leaf", ["head__fit_id", "lug__count"])
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_a_non_finite_value_stops_as_a_fatal_not_as_an_exception(tmp_path, monkeypatch, leaf, bad):
+    """`name()` が `round(nan)`・`int(inf)` で落ちると、構造の検査の fatal にも、例外時の `_stale_dirs()` にも届かない。"""
+    monkeypatch.setattr(build, "OUT", tmp_path)
+    assert build.build(discover(CAD)["gatling"].override(**{leaf: bad})) >= 1
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_main_builds_gatling_by_name(tmp_path, monkeypatch):
     monkeypatch.setattr(build, "OUT", tmp_path)
     assert build.main(["build.py", "gatling"]) == 0

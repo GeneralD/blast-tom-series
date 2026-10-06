@@ -8,6 +8,7 @@ SPEC に導出値を葉として持たせると、`override()` で入力を振�
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from drumcad.dims import Dim, derived_from, provisional
@@ -82,12 +83,17 @@ def derive(spec: GatlingSpec) -> Derived:
     )
 
 
+def _whole(value: float, to_int: Callable[[float], int] = round) -> str:
+    """名前に入れる整数。NaN・±inf は `round()`・`int()` が例外にするので、その語（`nan`・`inf`・`-inf`）のまま書く。"""
+    return str(to_int(value)) if math.isfinite(value) else str(value)
+
+
 def name(spec: GatlingSpec) -> str:
     """出力ディレクトリ名の語幹。`gatling-<径 inch>-<ラグ数>`。
 
     `derive()` は呼ばない。`build._build` は `issues()` より先に `name()` を呼ぶので、`derive()` の
     `math.pi / n` を通すと `tube.count = 0` が構造の検査（fatal）に届く前に `ZeroDivisionError` になる。
-    胴外径だけを `shell_od()` で出す。
+    胴外径だけを `shell_od()` で出す。非有限値（NaN・inf）も例外にせず `_whole()` で語にして返し、診断は
+    `structure()` に任せる（`_stale_dirs()` も同じ名前を使うので、ここで落ちると退避もできない）。
     """
-    inch = round(shell_od(spec) / 25.4)
-    return f"gatling-{inch}-{int(float(spec.lug.count))}"
+    return f"gatling-{_whole(shell_od(spec) / 25.4)}-{_whole(float(spec.lug.count), int)}"

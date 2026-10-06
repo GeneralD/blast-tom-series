@@ -111,6 +111,19 @@ def test_name_is_model_inch_and_lug_count():
     assert name(override(SPEC, tube__count=0)) == "gatling-6-6"     # derive() を通さない（個数で割らない）
 
 
+@pytest.mark.parametrize("leaf", ["head__fit_id", "head__fit_clearance", "lug__count"])
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_name_does_not_raise_on_a_non_finite_value_and_leaves_the_diagnosis_to_structure(leaf, bad):
+    """`round(nan)` は ValueError、`int(inf)` は OverflowError。`_build` は `issues()` より先に `name()` を呼ぶので、例外は構造の検査に届かない。"""
+    assert name(override(SPEC, **{leaf: bad})).startswith("gatling-")
+
+
+def test_name_spells_a_non_finite_value_by_its_own_word():
+    assert name(override(SPEC, head__fit_id=float("nan"))) == "gatling-nan-6"
+    assert name(override(SPEC, lug__count=float("inf"))) == "gatling-6-inf"
+    assert name(override(SPEC, lug__count=float("nan"))) == "gatling-6-nan"
+
+
 def _declared(leaf: Dim) -> set[str]:
     """導出値の注記「…（仮の入力: a, b）」から入力の葉の一覧を読む。"""
     return set(leaf.note.rsplit("（仮の入力: ", 1)[1].rstrip("）").split(", "))
