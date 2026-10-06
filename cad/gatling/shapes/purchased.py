@@ -9,7 +9,7 @@ import cadquery as cq
 
 from ..fasteners import lookup_holder, lookup_rod, lookup_screw
 from ..params import GatlingSpec
-from ..placement import KNOB_EMBED, flange_bolt_points, holder_centre, levels, lug_angles, radii, tip_bolt_points
+from ..placement import KNOB_EMBED, flange_bolt_points, holder_centre, knob_rim, levels, lug_angles, radii, tip_bolt_points
 from .common import around_z, compound, cylinder, cylinders, disc, ring
 
 
@@ -30,11 +30,11 @@ def lug(spec: GatlingSpec) -> cq.Workplane:
     胴側は胴の外面の円柱で切って、食い込まず離れず沿わせる。ロッドの穴（呼び径）は円盤の上端から縦に開く止まり穴で、
     底はロッドの軸の先（円盤の下端より下に出る設定では下端まで通る。先がラグの上端からねじ込み代まで届くかは `checks.rod_fits` が見る）。"""
     z, r, s = levels(spec), radii(spec), spec.lug
-    zc = (z.lug_top + z.lug_bottom) / 2
+    zc = z.lug_centre
     # 軸の上の胴の中心から始めて外側の面まで伸ばし、胴の外面の円柱で切る（円弧に沿わせる。外側の面は胴の外面から depth の平面）
-    disc = cylinder((0, 0, zc), (1, 0, 0), float(s.body_dia), r.shell + float(s.depth))
+    blank = cylinder((0, 0, zc), (1, 0, 0), float(s.body_dia), r.shell + float(s.depth))
     bore = cylinders([(r.rod, 0)], float(lookup_rod(s.thread)), max(z.rod_tip, z.lug_bottom), z.lug_top)   # 底 = 軸の先（軸が穴を埋める）
-    solid = disc.cut(bore).cut(cylinders([(0, 0)], 2 * r.shell, z.lug_bottom - 1, z.lug_top + 1))   # 円盤の上下の接線を避けて 1 mm 広く
+    solid = blank.cut(bore).cut(cylinders([(0, 0)], 2 * r.shell, z.lug_bottom - 1, z.lug_top + 1))   # 円盤の上下の接線を避けて 1 mm 広く
     return around_z(solid, lug_angles(spec))
 
 
@@ -54,7 +54,7 @@ def holder(spec: GatlingSpec) -> cq.Workplane:
     x, y = holder_centre(spec)
     body = cylinders([(x, y)], float(m.body_dia), z.holder_bottom, z.holder_top)
     bore = cylinder((-float(m.body_dia), y, z.knob_centre), (1, 0, 0), float(lookup_holder(m.type)), 2 * float(m.body_dia))
-    rim = y - float(m.body_dia) / 2
+    rim = knob_rim(spec)
     knob = cylinder((x, rim + KNOB_EMBED, z.knob_centre), (0, -1, 0), float(m.knob_dia), float(m.knob_length) + KNOB_EMBED)
     return body.cut(bore).union(knob)
 

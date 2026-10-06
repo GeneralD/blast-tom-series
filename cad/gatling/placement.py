@@ -13,7 +13,7 @@ import math
 from dataclasses import dataclass
 
 from .derived import MIL, derive
-from .fasteners import lookup_screw
+from .fasteners import lookup_rod
 from .params import GatlingSpec
 from .planar import Point, rect
 from .tubepath import Path, Vec, fillet, plan_polygons, tangent_length, turn_angle
@@ -23,9 +23,9 @@ PAD_SIDES = (1, -1)
 PAD_COUNT = len(PAD_SIDES)        # 当て板の枚数 = スペードグリップの本数（左右対称）
 
 # ラグは胴にねじ 1 本で留める（D-21）。胴の取付穴はラグ 1 個につき、ラグの高さ（= 円盤の径）の中心に 1 つ。
-# 値は穴の位置の円盤の中心からの比（円盤の径 × 値だけ上）。形は符号でループし、員数は `LUG_HOLES` で数える。
-LUG_HOLE_SIDES = (0,)
-LUG_HOLES = len(LUG_HOLE_SIDES)
+# 値は穴の位置の、円盤の中心からの上下のずれの比（円盤の径 × 値）。形はこのずれでループし、員数は `LUG_HOLES` で数える。
+LUG_HOLE_OFFSETS = (0,)
+LUG_HOLES = len(LUG_HOLE_OFFSETS)
 
 
 def ring_points(count: int, radius: float, phase_deg: float = 0.0) -> list[tuple[float, float]]:
@@ -48,6 +48,16 @@ def tip_bolt_points(spec: GatlingSpec) -> list[tuple[float, float]]:
     """先端クランプの意匠ボルト。管の間（中心円の上、隣り合う管の真ん中）。"""
     n = int(float(spec.tube.count))
     return ring_points(n, float(derive(spec).pcd) / 2, 180.0 / n)
+
+
+def ear_hole_dia(spec: GatlingSpec) -> float:
+    """受金のロッド通し穴の径（ロッドの呼び径 + 逃げ）。受金の形と、受金・ロッドの検査が同じ値を読む。"""
+    return float(lookup_rod(spec.lug.thread)) + float(spec.hoop.ear.hole_clearance)
+
+
+def tube_hole_dia(spec: GatlingSpec) -> float:
+    """管穴の径（管の外径 + 穴の逃げ）。ヘッダープレート・両クランプの穴の形と、管どうしの検査が同じ値を読む。"""
+    return float(spec.tube.od) + float(spec.header.hole_clearance)
 
 
 def lug_angles(spec: GatlingSpec) -> list[float]:
@@ -82,11 +92,13 @@ class Levels:
     tip_bottom: float
     tube_tip: float
     pipe_centre: float        # 外リングの管の中心の高さ（= フープの上端 − 管の外径 / 2）
+    pipe_bottom: float        # 外リングの管の下端（= フープの上端 − 管の外径）
     hoop_bottom: float        # フープの下端（内リングの下面と管の下端のうち低いほう）
     rod_top: float            # テンションロッドの頭の上面（頭は受金の上面に載る）
     rod_tip: float            # テンションロッドの軸の先（受金の上面から rod_length 下）
     lug_top: float
     lug_bottom: float
+    lug_centre: float         # ラグの円盤の中心の高さ（胴の取付穴の高さ）
     arm_centre: float         # 腕の管の中心の高さ。当て板の高さの中心も同じ（プレナム胴の中ほど）
     arm_bottom: float
     arm_top: float
@@ -108,11 +120,13 @@ def levels(spec: GatlingSpec) -> Levels:
     collar_bottom = head_top - float(spec.head.collar_height)
     hoop_top = head_top + float(spec.hoop.inner.height)
     pipe = float(spec.hoop.outer.od)
-    hoop_bottom = min(head_top, hoop_top - pipe)
+    pipe_bottom = hoop_top - pipe
+    hoop_bottom = min(head_top, pipe_bottom)
     # 受金の z はここ 1 か所で決める: ロッドの頭の上面（受金の上面 + 頭の高さ）をリムの上端に揃え、受金はそこから下へ板厚ぶん
     ear_top = hoop_top - float(spec.lug.rod_head_height)
     ear_bottom = ear_top - float(spec.hoop.ear.thickness)
     lug_top = min(collar_bottom, hoop_bottom) - float(spec.hoop.takeup)
+    lug_bottom = lug_top - float(spec.lug.body_dia)
     mid_top = -float(c.mid_position) * length
     tip_bottom = -length + float(t.protrusion_ratio) * float(t.od)
     arm_centre = flange_top + float(spec.shell.plenum_height) / 2
@@ -124,8 +138,8 @@ def levels(spec: GatlingSpec) -> Levels:
         gasket_top=gasket_top, header_bottom=-float(spec.header.thickness),
         mid_top=mid_top, mid_bottom=mid_top - float(c.mid_thickness),
         tip_top=tip_bottom + float(c.tip_thickness), tip_bottom=tip_bottom, tube_tip=-length,
-        pipe_centre=hoop_top - pipe / 2, hoop_bottom=hoop_bottom,
-        rod_top=ear_top + float(spec.lug.rod_head_height), rod_tip=ear_top - float(spec.lug.rod_length), lug_top=lug_top, lug_bottom=lug_top - float(spec.lug.body_dia),
+        pipe_centre=hoop_top - pipe / 2, pipe_bottom=pipe_bottom, hoop_bottom=hoop_bottom,
+        rod_top=ear_top + float(spec.lug.rod_head_height), rod_tip=ear_top - float(spec.lug.rod_length), lug_top=lug_top, lug_bottom=lug_bottom, lug_centre=(lug_top + lug_bottom) / 2,
         arm_centre=arm_centre, arm_bottom=arm_centre - arm_r, arm_top=arm_centre + arm_r,
         pad_bottom=arm_centre - float(spec.pad.height) / 2, pad_top=arm_centre + float(spec.pad.height) / 2,
         block_top=block_top, holder_bottom=block_top, holder_top=holder_top, knob_centre=(block_top + holder_top) / 2,
@@ -189,12 +203,12 @@ def lug_plan(spec: GatlingSpec, z0: float | None = None, z1: float | None = None
     方位 a のラグの平面座標は x = u cos a − v sin a、y = u sin a + v cos a（`lug_angles` の向き）。
     """
     s, z = spec.lug, levels(spec)
-    shell = float(derive(spec).shell_od) / 2
+    shell = radii(spec).shell
     b = float(s.body_dia) / 2
     if z0 is None or z1 is None:
         half = b
     else:
-        zc = (z.lug_top + z.lug_bottom) / 2
+        zc = z.lug_centre
         lo, hi = max(z0, z.lug_bottom), min(z1, z.lug_top)
         d = 0.0 if lo <= zc <= hi else min(abs(lo - zc), abs(hi - zc))
         half = math.sqrt(max(b * b - d * d, 0.0))
@@ -280,12 +294,15 @@ def block_plan(spec: GatlingSpec) -> list[Point]:
     return rect(-float(b.width) / 2, float(b.width) / 2, y - float(b.depth) / 2, y + float(b.depth) / 2)
 
 
+def knob_rim(spec: GatlingSpec) -> float:
+    """つまみの根元（ホルダー受けの本体の後ろ側の外面の y）。形（`purchased.holder`）と平面形（`knob_plan`）が同じ値から始める。"""
+    return holder_centre(spec)[1] - float(spec.mount.body_dia) / 2
+
+
 def knob_plan(spec: GatlingSpec) -> list[Point]:
     """つまみ（ホルダー受けの後ろへ水平に出る円柱）の平面形。本体の外面から 1 mm 食い込ませて（形は 1 つにつなぐ）、`knob_length` 出す。"""
-    m, y = spec.mount, holder_centre(spec)[1]
-    rim = y - float(m.body_dia) / 2
-    half = float(m.knob_dia) / 2
-    return rect(-half, half, rim - float(m.knob_length), rim + KNOB_EMBED)
+    rim, half = knob_rim(spec), float(spec.mount.knob_dia) / 2
+    return rect(-half, half, rim - float(spec.mount.knob_length), rim + KNOB_EMBED)
 
 
 KNOB_EMBED = 1.0                  # つまみが本体の中へ入る長さ（mm）
@@ -300,6 +317,16 @@ class GripPose:
     direction: tuple[float, float, float]
     length: float
     cap: float
+
+    @property
+    def tip(self) -> tuple[float, float, float]:
+        """管の先（端板が載る面の中心）。"""
+        return tuple(s + self.length * d for s, d in zip(self.start, self.direction))
+
+    @property
+    def end(self) -> tuple[float, float, float]:
+        """端板の先の面の中心。"""
+        return tuple(s + (self.length + self.cap) * d for s, d in zip(self.start, self.direction))
 
 
 def grip_poses(spec: GatlingSpec) -> list[GripPose]:
@@ -332,7 +359,6 @@ def grip_polys(spec: GatlingSpec) -> list[list[Point]]:
 
 
 def grip_z(spec: GatlingSpec) -> tuple[float, float]:
-    """スペードグリップの z の範囲。上は付け根の管の上端、下は端板の中心から管の半径ぶん下（見落とさない側）。"""
+    """スペードグリップの z の範囲。上は付け根の管の上端、下は端板の先の面の中心から管の半径ぶん下（見落とさない側）。"""
     r, pose = float(spec.arm.pipe.od) / 2, grip_poses(spec)[0]
-    end = pose.start[2] + (pose.length + pose.cap) * pose.direction[2]
-    return min(end, pose.start[2]) - r, pose.start[2] + r
+    return min(pose.end[2], pose.start[2]) - r, pose.start[2] + r

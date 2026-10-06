@@ -3,7 +3,7 @@
 検査の見逃し（fatal 0 なのに形が重なる）をレビューで 1 件ずつ見つけて塞ぐのを繰り返したので、個々の override ではなく
 性質そのものを、固定 seed の乱数で作った override で確かめる。override は既定値の周りの現実的な範囲で、複数の葉を
 同時に振る（1 つずつ振ると、2 つの寸法の組み合わせで起きる重なりを見落とす）。fatal になった override は形を作らずに
-除く（既定の 40 件のうち 20 件が fatal 0 で、形を作って確かめる）。ボルトとねじ込む相手（下穴）の 3 組は既定でも重なるので除く（`gatling_overlap.py`）。
+除く（既定の 40 件のうち 20 件が fatal 0 で、形を作って確かめる）。ボルトとねじ込む相手（下穴）の 2 組は既定でも重なるので除く（`gatling_overlap.py`）。
 
 件数は全テスト（`pytest cad/tests`）が約 100〜110 秒（実測）で終わる数にしてある。環境変数 `GATLING_SWEEP_CASES` で増やせる（ローカルで数百件を回して
 見逃しを探すとき）。見つかった見逃しは、塞いだうえで `test_gatling_interference.py` に回帰テストとして足す。
@@ -17,20 +17,17 @@ import random
 import pytest
 from drumcad.checks import fatal_count
 from drumcad.dims import Choice, walk
-from gatling.checks import issues
-from gatling.fasteners import HOLDER_RODS, ROD_THREADS, SCREWS
+from gatling.checks import _COUNTS, _TABLES, issues
 from gatling.params import SPEC, override
 from gatling_overlap import overlaps
 
 SEED = 20261001
 CASES = int(os.environ.get("GATLING_SWEEP_CASES", "40"))
 
-# 形状に入らない葉（振っても形が変わらない）と、個数（下で揃えて振る）
+# 形状に入らない葉（振っても形が変わらない）。個数（`_COUNTS`。下で揃えて振る）と規格の呼び（`_TABLES`）は `checks` の表をそのまま使う
 _NOT_SHAPE = {"head.f01_range[0]", "head.f01_range[1]", "head.loss_factor"}
-_COUNTS = {"tube.count", "lug.count", "hoop.ear.count", "flange.bolt_count"}
 _NUMERIC = [path for path, leaf in walk(SPEC)
             if not isinstance(leaf, Choice) and path not in _NOT_SHAPE and path not in _COUNTS]
-_CHOICES = {"flange.bolt": SCREWS, "clamp.bolt": SCREWS, "lug.thread": ROD_THREADS, "mount.type": HOLDER_RODS}
 
 
 def random_override(rng: random.Random) -> dict[str, object]:
@@ -47,8 +44,8 @@ def random_override(rng: random.Random) -> dict[str, object]:
     if rng.random() < 0.15:
         values["flange.bolt_count"] = rng.choice([3, 4, 6, 8, 12])
     if rng.random() < 0.2:
-        path = rng.choice(sorted(_CHOICES))
-        values[path] = rng.choice(sorted(_CHOICES[path]))
+        path = rng.choice(sorted(_TABLES))
+        values[path] = rng.choice(sorted(_TABLES[path]))
     return values
 
 

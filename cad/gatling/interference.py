@@ -24,6 +24,17 @@ from .placement import (arm_polys, block_plan, flange_bolt_points, grip_polys, g
 from .planar import EPS, Point, circle_overlaps, origin_distance, polygons_overlap, rect, z_overlap
 
 
+# 部品の名前（表示名）。引くキーと表示を 1 か所に置く: 文字列の書き写しだと、名前を直したときに引けず、`ear_clear` は
+# `StopIteration`、`mount_clear` の中空の判定は黙って外れ、`_WELDED` の免除は効かなくなる。
+SHELL_RING = "胴・エッジ環"
+FRESH_HOOP = "フレッシュフープ"
+OUTER_RING = "外リング（管）"
+ARM = "腕"
+GRIP = "スペードグリップ"
+BLOCK = "ブロック"
+HOLDER = "ホルダー受け"
+
+
 def hoop_rings(spec: GatlingSpec) -> list[tuple[str, float, float, float]]:
     """フープの回転体の外半径と z の範囲（名前, 外半径, 下端, 上端）。
 
@@ -34,7 +45,7 @@ def hoop_rings(spec: GatlingSpec) -> list[tuple[str, float, float, float]]:
     z, r = levels(spec), radii(spec)
     return [
         ("内リング", r.hoop_in_outer, z.head_top, z.hoop_top),
-        ("外リング（管）", r.hoop_out_outer, z.hoop_top - float(spec.hoop.outer.od), z.hoop_top),
+        (OUTER_RING, r.hoop_out_outer, z.pipe_bottom, z.hoop_top),
         ("受金", math.hypot(r.hoop_out_centre, float(spec.hoop.ear.width) / 2), z.ear_bottom, z.ear_top),
     ]
 
@@ -43,8 +54,8 @@ def _round_parts(spec: GatlingSpec) -> list[tuple[str, float, float, float]]:
     """胴まわりの回転体の外半径と z の範囲（名前, 外半径, 下端, 上端）。平面視ではこの半径の円の内側を占めるとみなす。"""
     z, r = levels(spec), radii(spec)
     return [
-        ("胴・エッジ環", r.shell, z.flange_top, z.edge_top),
-        ("フレッシュフープ", r.collar, z.collar_bottom, z.head_top),
+        (SHELL_RING, r.shell, z.flange_top, z.edge_top),
+        (FRESH_HOOP, r.collar, z.collar_bottom, z.head_top),
         *hoop_rings(spec),
         ("フランジ・ヘッダープレート", float(derive(spec).plate_od) / 2, z.header_bottom, z.flange_top),
     ]
@@ -58,7 +69,7 @@ def ear_clear(spec: GatlingSpec) -> list[Issue]:
     大きくしたとき）だと、受金がカラーを食う。
     """
     z, r = levels(spec), radii(spec)
-    name, radius, z0, z1 = next(part for part in _round_parts(spec) if part[0] == "フレッシュフープ")
+    name, radius, z0, z1 = next(part for part in _round_parts(spec) if part[0] == FRESH_HOOP)
     if z_overlap(z.ear_bottom, z.ear_top, z0, z1) and r.hoop_in_outer < radius - EPS:
         return [Issue(True, f"受金が{name}に食い込む（平面視で受金の内端 {r.hoop_in_outer:.2f} < 外半径 {radius:.2f}、z も重なる）")]
     return []
@@ -87,7 +98,7 @@ class Body:
 
 # 溶接で接する組は、形状が相手の外形で切って体積を共有しない（ブロックとグリップは腕の外形で切る。`shapes/mount.py`）。
 # ホルダー受けとつまみは 1 つの部品。当て板と腕は、腕が当て板の外面に平らな端で接するだけなので、免除せず平面の重なりで見る
-_WELDED = {frozenset({"腕", "スペードグリップ"}), frozenset({"腕", "ブロック"}), frozenset({"ホルダー受け"})}
+_WELDED = {frozenset({ARM, GRIP}), frozenset({ARM, BLOCK}), frozenset({HOLDER})}
 
 
 def mount_bodies(spec: GatlingSpec) -> list[Body]:
@@ -95,11 +106,11 @@ def mount_bodies(spec: GatlingSpec) -> list[Body]:
     z, r, m = levels(spec), radii(spec), spec.mount
     kr = float(m.knob_dia) / 2
     bodies = [Body("当て板", (poly,), z=(z.pad_bottom, z.pad_top), reach=r.shell) for poly in pad_polys(spec)]
-    bodies.append(Body("腕", tuple(arm_polys(spec)), z=(z.arm_bottom, z.arm_top)))
-    bodies += [Body("スペードグリップ", (poly,), z=grip_z(spec)) for poly in grip_polys(spec)]
-    bodies += [Body("ブロック", (block_plan(spec),), z=(z.arm_centre, z.block_top)),
-               Body("ホルダー受け", circles=((holder_centre(spec), float(m.body_dia) / 2),), z=(z.holder_bottom, z.holder_top)),
-               Body("ホルダー受け", (knob_plan(spec),), z=(z.knob_centre - kr, z.knob_centre + kr))]
+    bodies.append(Body(ARM, tuple(arm_polys(spec)), z=(z.arm_bottom, z.arm_top)))
+    bodies += [Body(GRIP, (poly,), z=grip_z(spec)) for poly in grip_polys(spec)]
+    bodies += [Body(BLOCK, (block_plan(spec),), z=(z.arm_centre, z.block_top)),
+               Body(HOLDER, circles=((holder_centre(spec), float(m.body_dia) / 2),), z=(z.holder_bottom, z.holder_top)),
+               Body(HOLDER, (knob_plan(spec),), z=(z.knob_centre - kr, z.knob_centre + kr))]
     return bodies
 
 
@@ -142,7 +153,7 @@ def mount_clear(spec: GatlingSpec) -> list[Issue]:
 
     for body in bodies:
         for name, radius, z0, z1 in [*_round_parts(spec), _tube_bundle(spec)]:
-            hollow = r.hoop_out_inner if name == "外リング（管）" else 0.0       # 管の環は内面〜外面の帯。内面の内側に収まる部品は当たらない
+            hollow = r.hoop_out_inner if name == OUTER_RING else 0.0       # 管の環は内面〜外面の帯。内面の内側に収まる部品は当たらない
             if z_overlap(z0, z1, *body.z) and body.nearest() < radius - EPS and body.farthest() > hollow + EPS:
                 report(f"{body.part}が{name}に食い込む（平面視で内縁 {body.nearest():.2f} < 外半径 {radius:.2f}、z も重なる）")
     rod_r = float(lookup_rod(spec.lug.thread)) / 2
@@ -180,7 +191,7 @@ def flange_bolts_removable(spec: GatlingSpec) -> list[Issue]:
     z = levels(spec)
     screw = lookup_screw(spec.flange.bolt)
     head = float(screw.head_dia) / 2
-    need = float(screw.head_height) + float(spec.flange.bolt_length) - float(spec.flange.thickness) - float(spec.gasket.thickness)
+    need = float(screw.head_height) + float(spec.flange.bolt_length) - z.flange_top       # 頭の高さ + ねじ込み長（軸のうちフランジ・ガスケットを抜けた先）
     over: dict[str, float] = {}
     for centre in flange_bolt_points(spec):
         probe = Body("ボルトの頭", circles=((centre, head),))

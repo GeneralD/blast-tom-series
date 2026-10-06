@@ -7,7 +7,7 @@ import math
 
 import pytest
 from drumcad.dims import Choice, Dim, Source, as_provisional, design, walk
-from gatling.derived import Derived, derive, derived_from, name
+from gatling.derived import Derived, derive, derived_from, name, shell_od
 from gatling.params import SPEC, override
 
 
@@ -133,3 +133,11 @@ def test_every_leaf_that_moves_a_derived_value_is_declared_as_its_input(base):
         for field in dataclasses.fields(Derived):
             if float(getattr(moved, field.name)) != pytest.approx(float(getattr(before, field.name))):
                 assert path in _declared(getattr(before, field.name)), (field.name, path)
+
+
+def test_the_shell_outside_diameter_is_one_expression_shared_by_derive_name_and_the_checks():
+    assert shell_od(SPEC) == pytest.approx(152.0) and float(derive(SPEC).shell_od) == shell_od(SPEC)
+    moved = override(SPEC, head__fit_id=203.2, head__fit_clearance=0.8)
+    assert shell_od(moved) == pytest.approx(202.4) and float(derive(moved).shell_od) == shell_od(moved)
+    assert name(moved) == "gatling-8-6"                                      # 202.4 / 25.4 = 7.97 → 8
+    assert shell_od(override(SPEC, tube__count=0)) == pytest.approx(152.0)   # 個数に依存しない（0 割りしない）

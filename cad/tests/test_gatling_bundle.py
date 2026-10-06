@@ -96,3 +96,12 @@ def test_the_tubes_pass_through_the_header_and_both_clamps_without_overlapping_t
     t = cq.Compound.makeCompound(tube(SPEC).solids().vals())
     for plate in (header(SPEC), clamp_mid(SPEC), clamp_tip(SPEC)):
         assert t.intersect(cq.Compound.makeCompound(plate.solids().vals())).Volume() == pytest.approx(0, abs=1e-6)
+
+
+def test_the_tube_holes_follow_the_hole_dia_that_the_check_reads():
+    """管穴の径は placement の `tube_hole_dia` 1 か所。ヘッダー・中間クランプ・先端クランプの穴が同じ径で開く。"""
+    from gatling.placement import tube_hole_dia
+    tight, loose = override(SPEC, header__hole_clearance=0.2), override(SPEC, header__hole_clearance=1.2)
+    area = math.pi / 4 * 6 * (tube_hole_dia(loose) ** 2 - tube_hole_dia(tight) ** 2)
+    for part, thickness in ((header, 6), (clamp_mid, 3), (clamp_tip, 6)):
+        assert _volume(part(tight)) - _volume(part(loose)) == pytest.approx(area * thickness, rel=1e-6), part.__name__

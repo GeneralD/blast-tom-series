@@ -128,3 +128,13 @@ def test_the_ear_hugs_the_inner_ring_along_its_round_outer_face_without_a_gap():
 def test_the_hoop_follows_the_head_size():
     bigger = override(SPEC, head__fit_id=165.1)
     assert _box(hoop_inner(bigger)).xlen > _box(hoop_inner(SPEC)).xlen
+
+
+def test_the_ear_hole_follows_the_hole_dia_that_the_check_reads():
+    """穴径は placement の `ear_hole_dia` 1 か所。逃げを変えると、受金の体積が穴の面積ぶんだけ変わる（穴は板の中に収まる）。"""
+    from gatling.placement import ear_hole_dia, levels
+    z = levels(SPEC)
+    height = z.ear_top - z.ear_bottom
+    small, big = override(SPEC, hoop__ear__hole_clearance=0.5), override(SPEC, hoop__ear__hole_clearance=2.0)
+    assert (_volume(ear(small)) - _volume(ear(big))) == pytest.approx(
+        6 * height * math.pi / 4 * (ear_hole_dia(big) ** 2 - ear_hole_dia(small) ** 2), rel=1e-6)

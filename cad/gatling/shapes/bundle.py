@@ -7,19 +7,15 @@ import cadquery as cq
 from ..derived import derive
 from ..fasteners import lookup_screw
 from ..params import GatlingSpec
-from ..placement import flange_bolt_points, levels, tip_bolt_points, tube_points
+from ..placement import flange_bolt_points, levels, tip_bolt_points, tube_hole_dia, tube_points
 from .common import cylinders, disc, ring
-
-
-def _tube_hole_d(spec: GatlingSpec) -> float:
-    return float(spec.tube.od) + float(spec.header.hole_clearance)
 
 
 def header(spec: GatlingSpec) -> cq.Workplane:
     """プレナムの蓋。管の穴 6 と、フランジと同じボルト円の M6 下穴 6。"""
     z, d = levels(spec), derive(spec)
     body = disc(float(d.plate_od) / 2, z.header_bottom, 0)
-    body = body.cut(cylinders(tube_points(spec), _tube_hole_d(spec), z.header_bottom, 0))
+    body = body.cut(cylinders(tube_points(spec), tube_hole_dia(spec), z.header_bottom, 0))
     return body.cut(cylinders(flange_bolt_points(spec), float(lookup_screw(spec.flange.bolt).tap_drill), z.header_bottom, 0))
 
 
@@ -53,12 +49,12 @@ def clamp_mid(spec: GatlingSpec) -> cq.Workplane:
     """中間クランプ（環）。管の穴 6 と中央の穴。"""
     z, d = levels(spec), derive(spec)
     body = ring(float(d.clamp_od) / 2, float(d.clamp_hole_d) / 2, z.mid_bottom, z.mid_top)
-    return body.cut(cylinders(tube_points(spec), _tube_hole_d(spec), z.mid_bottom, z.mid_top))
+    return body.cut(cylinders(tube_points(spec), tube_hole_dia(spec), z.mid_bottom, z.mid_top))
 
 
 def clamp_tip(spec: GatlingSpec) -> cq.Workplane:
     """先端クランプ（円盤）。管の穴 6 と、管の間の M5 下穴 6（意匠ボルト）。"""
     z, d = levels(spec), derive(spec)
     body = disc(float(d.clamp_od) / 2, z.tip_bottom, z.tip_top)
-    body = body.cut(cylinders(tube_points(spec), _tube_hole_d(spec), z.tip_bottom, z.tip_top))
+    body = body.cut(cylinders(tube_points(spec), tube_hole_dia(spec), z.tip_bottom, z.tip_top))
     return body.cut(cylinders(tip_bolt_points(spec), float(lookup_screw(spec.clamp.bolt).tap_drill), z.tip_bottom, z.tip_top))

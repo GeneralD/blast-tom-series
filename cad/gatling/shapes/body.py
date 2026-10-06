@@ -8,7 +8,7 @@ import cadquery as cq
 
 from ..derived import derive
 from ..params import GatlingSpec
-from ..placement import LUG_HOLE_SIDES, levels, lug_angles, radii
+from ..placement import LUG_HOLE_OFFSETS, levels, lug_angles, radii
 from .common import cylinder, ring
 
 
@@ -16,11 +16,11 @@ def shell(spec: GatlingSpec) -> cq.Workplane:
     """プレナム胴。ラグの取付穴は、ラグ 1 個につき `LUG_HOLES` つ（円盤の中心の高さ。ねじ 1 本で留める）。"""
     z, r_out = levels(spec), radii(spec).shell
     body = ring(r_out, float(derive(spec).shell_id) / 2, z.flange_top, z.shell_top)
-    zc = (z.lug_top + z.lug_bottom) / 2
+    zc = z.lug_centre
     radius = float(spec.lug.hole_dia) / 2
     for angle in lug_angles(spec):
-        for side in LUG_HOLE_SIDES:
-            bore = cylinder((0, 0, zc + side * float(spec.lug.body_dia)), (1, 0, 0), 2 * radius, 2 * r_out)
+        for offset in LUG_HOLE_OFFSETS:
+            bore = cylinder((0, 0, zc + offset * float(spec.lug.body_dia)), (1, 0, 0), 2 * radius, 2 * r_out)
             body = body.cut(bore.rotate((0, 0, 0), (0, 0, 1), angle))
     return body
 

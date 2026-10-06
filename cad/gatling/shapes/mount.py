@@ -11,7 +11,7 @@ import cadquery as cq
 from ..params import GatlingSpec
 from ..placement import arm_path, grip_poses, holder_centre, levels, pad_angles, radii
 from ..tubepath import Line
-from .common import compound, ring
+from .common import compound, cylinder, ring
 
 _V = cq.Vector
 
@@ -74,10 +74,6 @@ def block(spec: GatlingSpec) -> cq.Workplane:
     return box.cut(_envelope(spec), tol=_FUZZY)
 
 
-def _cylinder(origin: tuple[float, float, float], direction: tuple[float, float, float], radius: float, length: float) -> cq.Workplane:
-    return cq.Workplane("XY").newObject([cq.Solid.makeCylinder(radius, length, _V(*origin), _V(*direction))])
-
-
 def grip(spec: GatlingSpec) -> cq.Workplane:
     """スペードグリップ（左右 2 本）の管。付け根（後ろの角の円弧の中央、中心線の上）から斜め下・後ろ・外へ `length`。
     付け根は腕の管の外形で切って、腕に沿わせる（魚の口形）。端は開いたままで、端板（`grip_cap`）を溶接する。"""
@@ -85,7 +81,7 @@ def grip(spec: GatlingSpec) -> cq.Workplane:
     envelope = _envelope(spec)
     tubes = []
     for pose in grip_poses(spec):
-        tube = _cylinder(pose.start, pose.direction, r, pose.length).cut(_cylinder(pose.start, pose.direction, r - wall, pose.length))
+        tube = cylinder(pose.start, pose.direction, 2 * r, pose.length).cut(cylinder(pose.start, pose.direction, 2 * (r - wall), pose.length))
         tubes.append(tube.cut(envelope, tol=_FUZZY))
     return compound(tubes)
 
@@ -95,6 +91,5 @@ def grip_cap(spec: GatlingSpec) -> cq.Workplane:
     r = float(spec.arm.pipe.od) / 2
     caps = []
     for pose in grip_poses(spec):
-        origin = tuple(s + pose.length * d for s, d in zip(pose.start, pose.direction))
-        caps.append(_cylinder(origin, pose.direction, r, pose.cap))
+        caps.append(cylinder(pose.tip, pose.direction, 2 * r, pose.cap))
     return compound(caps)

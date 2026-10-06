@@ -50,6 +50,11 @@ MIL = 0.0254                 # mm
 _DENSITY_NOTE = f"膜厚 × {float(FILM_DENSITY) * 1e3:g} g/cm³"     # g/mm³ → g/cm³ は × 1000
 
 
+def shell_od(spec: GatlingSpec) -> float:
+    """胴外径 = フレッシュフープ内径 − 逃げ。個数に依存しないので、`tube.count = 0` でも割らない（`derive`・`name`・`structure` が共有する）。"""
+    return float(spec.head.fit_id) - float(spec.head.fit_clearance)
+
+
 def derive(spec: GatlingSpec) -> Derived:
     """寸法から導出値を計算する。PCD = 中心間 / sin(180° / 本数) なので、`tube.count` が 3 未満だと
     周囲配置にならない（0 は `ZeroDivisionError`、1 は sin(180°) ≈ 0 で割って巨大な値、2 は PCD が中心間と
@@ -57,19 +62,19 @@ def derive(spec: GatlingSpec) -> Derived:
     `name()` は `issues()` より先に呼ばれるので、これを使わない。"""
     h, t, f, p = spec.head, spec.tube, spec.flange, spec.plate
     n = float(t.count)
-    shell_od = float(h.fit_id) - float(h.fit_clearance)
-    shell_id = shell_od - 2 * float(spec.shell.thickness)
+    outer = shell_od(spec)
+    shell_id = outer - 2 * float(spec.shell.thickness)
     head_od = float(h.fit_id) + 2 * float(h.collar_wall)
     pitch = float(t.od) * (1 + float(t.gap_ratio))
     pcd = pitch / math.sin(math.pi / n)
-    bolt_circle = shell_od + 2 * float(f.bolt_seat)
+    bolt_circle = outer + 2 * float(f.bolt_seat)
     margin = float(p.margin)
     tube_ring = pcd + float(t.od) + 2 * margin
     shell_in = {"head.fit_id": h.fit_id, "head.fit_clearance": h.fit_clearance}
     pitch_in = {"tube.od": t.od, "tube.gap_ratio": t.gap_ratio}
     tube_in = {**pitch_in, "tube.count": t.count}
     return Derived(
-        shell_od=derived_from(shell_od, "フレッシュフープ内径 − 逃げ", shell_in),
+        shell_od=derived_from(outer, "フレッシュフープ内径 − 逃げ", shell_in),
         shell_id=derived_from(shell_id, "胴外径 − 2 × 肉厚", {**shell_in, "shell.thickness": spec.shell.thickness}),
         head_od=derived_from(head_od, "フレッシュフープ内径 + 2 × 肉厚",
                              {"head.fit_id": h.fit_id, "head.collar_wall": h.collar_wall}),
@@ -78,10 +83,10 @@ def derive(spec: GatlingSpec) -> Derived:
         tube_pitch=derived_from(pitch, "od × (1 + gap_ratio)", pitch_in),
         pcd=derived_from(pcd, "中心間 / sin(180° / 本数)", tube_in),
         bolt_circle=derived_from(bolt_circle, "胴外径 + 2 × ボルト座", {**shell_in, "flange.bolt_seat": f.bolt_seat}),
-        plate_od=derived_from(max(tube_ring, bolt_circle + 2 * margin, shell_od),
+        plate_od=derived_from(max(tube_ring, bolt_circle + 2 * margin, outer),
                               "max(PCD + od + 2 × 縁, ボルト円 + 2 × 縁, 胴外径)",
                               {**shell_in, **tube_in, "flange.bolt_seat": f.bolt_seat, "plate.margin": p.margin}),
-        clamp_od=derived_from(max(tube_ring, shell_od), "max(PCD + od + 2 × 縁, 胴外径)",
+        clamp_od=derived_from(max(tube_ring, outer), "max(PCD + od + 2 × 縁, 胴外径)",
                               {**shell_in, **tube_in, "plate.margin": p.margin}),
         clamp_hole_d=derived_from(pcd - float(t.od) - 2 * margin, "PCD − od − 2 × 縁",
                                   {**tube_in, "plate.margin": p.margin}),
@@ -95,8 +100,7 @@ def name(spec: GatlingSpec) -> str:
 
     `derive()` は呼ばない。`build._build` は `issues()` より先に `name()` を呼ぶので、`derive()` の
     `math.pi / n` を通すと `tube.count = 0` が構造の検査（fatal）に届く前に `ZeroDivisionError` になる。
-    胴外径だけを `derive()` と同じ式で出す。
+    胴外径だけを `shell_od()` で出す。
     """
-    h = spec.head
-    inch = round((float(h.fit_id) - float(h.fit_clearance)) / 25.4)
+    inch = round(shell_od(spec) / 25.4)
     return f"gatling-{inch}-{int(float(spec.lug.count))}"

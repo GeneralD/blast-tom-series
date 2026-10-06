@@ -7,10 +7,10 @@ import math
 import pytest
 from gatling.params import SPEC, override
 from gatling.planar import origin_distance
-from gatling.placement import (LUG_HOLE_SIDES, LUG_HOLES, PAD_COUNT, PAD_SIDES, arm_bends, arm_path, arm_polys, arm_vertices, block_plan,
+from gatling.placement import (LUG_HOLE_OFFSETS, LUG_HOLES, PAD_COUNT, PAD_SIDES, arm_bends, arm_path, arm_polys, arm_vertices, block_plan,
                                flange_bolt_points, grip_polys, grip_poses, grip_z, holder_centre, knob_plan, levels, lug_angles,
                                lug_plan, pad_angles, pad_plan, pad_polys, pipe_inner_radius, radii, ring_points, tip_bolt_points,
-                               tube_points)
+                               tube_points, ear_hole_dia, knob_rim, tube_hole_dia)
 
 
 def _angle(point):
@@ -59,7 +59,7 @@ def test_the_levels_stack_from_the_head_down_to_the_tube_tips():
     assert z.head_top > z.edge_top > z.shell_top > z.flange_top > z.gasket_top > 0 > z.header_bottom > z.tube_tip
 
 
-def test_the_film_rests_on_the_bearing_edge_and_the_collar_hangs_outside_the_shell():
+def test_the_film_levels_sit_on_the_bearing_edge_and_the_collar_hangs_below_the_edge_top():
     z = levels(SPEC)
     assert z.head_top == pytest.approx(117 + 7.5 * 0.0254)                # 膜の下面 = エッジ頂部、上面 = + 膜厚
     assert z.collar_bottom == pytest.approx(z.head_top - 8)                 # フレッシュフープは膜の上面から 8 垂れる（109.19）
@@ -169,7 +169,7 @@ def test_the_pipe_inner_surface_is_narrowest_at_the_pipe_centre_height():
 
 
 def test_a_lug_is_held_by_a_single_screw_at_the_middle_of_its_height():
-    assert LUG_HOLE_SIDES == (0,) and LUG_HOLES == 1
+    assert LUG_HOLE_OFFSETS == (0,) and LUG_HOLES == 1
 
 
 def test_the_lug_plan_is_a_rectangle_from_the_shell_to_the_outer_face_of_the_disc():
@@ -267,3 +267,44 @@ def test_the_grip_plan_and_z_range_cover_the_sloped_tube_and_its_cap():
     xs = [x for x, _ in polys[0]]
     assert max(xs) > right.start[0] + 113 * right.direction[0]                                 # 端の円は斜めに見えて、前後に広がる
     assert grip_z(override(SPEC, grip__drop=0))[0] == pytest.approx(57 - 12.7)
+
+
+def test_the_shared_levels_are_derived_once_from_the_leaves():
+    """形と検査が各自で書いていた式を、`Levels` の葉に 1 か所で持つ（式のずれで形と検査が別の値を見る穴を塞ぐ）。"""
+    for spec in (SPEC, override(SPEC, lug__body_dia=24, hoop__outer__od=30, hoop__takeup=4, shell__plenum_height=90)):
+        z = levels(spec)
+        assert z.lug_centre == pytest.approx((z.lug_top + z.lug_bottom) / 2)
+        assert z.lug_centre - z.lug_bottom == pytest.approx(float(spec.lug.body_dia) / 2)
+        assert z.pipe_bottom == pytest.approx(z.hoop_top - float(spec.hoop.outer.od))
+        assert z.hoop_bottom == pytest.approx(min(z.head_top, z.pipe_bottom))
+
+
+def test_the_rod_head_top_sits_at_the_hoop_top_for_any_input():
+    """受金の上面 = フープの上端 − 頭の高さ、頭の上面 = 受金の上面 + 頭の高さ。なので頭の上面はフープの上端に揃い、受金は
+    フープの上端から突き出ない。この 2 つは入力によらず成り立つので、`checks` では見ない（恒真）。振って確かめる。"""
+    for height in (1, 5, 7.9):
+        for rim in (5, 8, 20):
+            for film in (3, 7.5, 10):
+                z = levels(override(SPEC, lug__rod_head_height=height, hoop__inner__height=rim, head__film_mil=film))
+                assert z.rod_top == pytest.approx(z.hoop_top, abs=1e-9) and z.ear_top < z.hoop_top, (height, rim, film)
+
+
+def test_the_hole_diameters_that_the_shapes_and_the_checks_share():
+    assert ear_hole_dia(SPEC) == pytest.approx(5.5 + 1.0)                      # ロッドの呼び径 + 逃げ
+    assert ear_hole_dia(override(SPEC, hoop__ear__hole_clearance=2, lug__thread="M5")) == pytest.approx(5.0 + 2.0)
+    assert tube_hole_dia(SPEC) == pytest.approx(38.1 + 0.2)                    # 管の外径 + 穴の逃げ
+    assert tube_hole_dia(override(SPEC, tube__od=42.7, header__hole_clearance=0.5)) == pytest.approx(43.2)
+
+
+def test_the_knob_rim_is_the_outside_of_the_holder_body_toward_the_back():
+    assert knob_rim(SPEC) == pytest.approx(-160 - 20)                                   # 中心 −160、本体の径 40 の半分
+    assert knob_rim(override(SPEC, arm__rear=200, mount__body_dia=30)) == pytest.approx(-215)
+    assert sorted(knob_plan(SPEC)) == pytest.approx(sorted([(-6, -205), (6, -205), (6, -179), (-6, -179)]))
+
+
+def test_a_grip_has_the_tube_tip_and_the_cap_end_on_its_axis():
+    right = grip_poses(SPEC)[0]
+    d = right.direction
+    assert right.tip == pytest.approx(tuple(s + 110 * c for s, c in zip(right.start, d)))
+    assert right.end == pytest.approx(tuple(s + 113 * c for s, c in zip(right.start, d)))
+    assert grip_z(SPEC)[0] == pytest.approx(min(right.end[2], right.start[2]) - 12.7)

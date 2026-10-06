@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import cadquery as cq
 
-from ..fasteners import lookup_rod
 from ..params import GatlingSpec
-from ..placement import levels, lug_angles, radii
+from ..placement import ear_hole_dia, levels, lug_angles, radii
 from .common import around_z, ring
 
 
@@ -52,5 +51,5 @@ def ear(spec: GatlingSpec) -> cq.Workplane:
     inner_ring = cq.Workplane("XY").workplane(offset=z.ear_bottom).circle(r.hoop_in_outer).extrude(height)
     plate = plate.cut(inner_ring)
     hole = (cq.Workplane("XY").workplane(offset=z.ear_bottom).center(r.rod, 0)
-            .circle((float(lookup_rod(spec.lug.thread)) + float(e.hole_clearance)) / 2).extrude(z.ear_top - z.ear_bottom))
+            .circle(ear_hole_dia(spec) / 2).extrude(z.ear_top - z.ear_bottom))
     return around_z(plate.cut(hole).cut(_pipe_section(spec, bore=False)), lug_angles(spec))
