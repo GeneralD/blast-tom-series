@@ -352,9 +352,9 @@ def grip_polys(spec: GatlingSpec) -> list[list[Point]]:
     r = float(spec.arm.pipe.od) / 2
     polys = []
     for pose in grip_poses(spec):
-        horizontal = math.hypot(pose.direction[0], pose.direction[1])
-        angle = math.degrees(math.atan2(pose.direction[1], pose.direction[0]))
-        reach = (pose.length + pose.cap) * horizontal
+        (x0, y0, _), (x1, y1, _) = pose.start, pose.end
+        angle = math.degrees(math.atan2(y1 - y0, x1 - x0))
+        reach = math.hypot(x1 - x0, y1 - y0)
         polys.append([(pose.start[0] + x, pose.start[1] + y) for x, y in rect(-r, reach + r, -r, r, angle)])
     return polys
 
