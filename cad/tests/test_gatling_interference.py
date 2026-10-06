@@ -259,3 +259,12 @@ def test_a_knob_is_a_body_of_its_own_and_hits_the_block_when_it_grows_down(monke
     hit = lambda d: [i for i in mount_clear(override(SPEC, mount__knob_dia=d)) if "ブロック" in i.what and "ホルダー受け" in i.what]
     assert hit(edge) == []
     assert len(hit(edge + 0.02)) == 1
+
+
+def test_a_grip_does_not_dig_into_the_arm_for_a_pipe_od_of_24_2():
+    """sweep で見つかった見逃し: 腕の管径だけを 24.2 にすると、グリップ（管と同じ半径の円柱）を腕の外形で切る処理が
+    半径の等しい円柱どうしの退化した交線で失敗し、グリップが腕に 322 mm³ 食い込んだ（fatal は 0 のまま）。
+    溶接で接する組は体積を共有しない。切るときにファジー許容を付けて直した（形の側）。"""
+    spec = override(SPEC, arm__pipe__od=24.2)
+    assert fatal_count(issues(spec)) == 0
+    assert overlaps(spec) == []

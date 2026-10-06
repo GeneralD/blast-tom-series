@@ -15,6 +15,10 @@ from .common import compound, ring
 
 _V = cq.Vector
 
+# 腕の外形で切るときのファジー許容（mm）。グリップの管は腕と同じ半径で、2 つの円柱の交線が退化する管径があり（24.2 など）、
+# 許容なしだと切りそこねてグリップが腕に食い込む。0.001 mm は形に影響しない大きさ。
+_FUZZY = 1e-3
+
 
 def pad(spec: GatlingSpec) -> cq.Workplane:
     """当て板（左右 2 枚）。幅 `width` × 高さ `height` の角を `corner` で丸めた矩形の柱を、胴の外面から板厚ぶんの円筒殻で切った曲げ板。
@@ -67,7 +71,7 @@ def block(spec: GatlingSpec) -> cq.Workplane:
     z, b = levels(spec), spec.block
     x, y = holder_centre(spec)
     box = cq.Workplane("XY").box(float(b.width), float(b.depth), float(b.height)).translate((x, y, z.arm_centre + float(b.height) / 2))
-    return box.cut(_envelope(spec))
+    return box.cut(_envelope(spec), tol=_FUZZY)
 
 
 def _cylinder(origin: tuple[float, float, float], direction: tuple[float, float, float], radius: float, length: float) -> cq.Workplane:
@@ -82,7 +86,7 @@ def grip(spec: GatlingSpec) -> cq.Workplane:
     tubes = []
     for pose in grip_poses(spec):
         tube = _cylinder(pose.start, pose.direction, r, pose.length).cut(_cylinder(pose.start, pose.direction, r - wall, pose.length))
-        tubes.append(tube.cut(envelope))
+        tubes.append(tube.cut(envelope, tol=_FUZZY))
     return compound(tubes)
 
 
