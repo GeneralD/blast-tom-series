@@ -12,10 +12,17 @@ def _fatal(spec):
     return [i.what for i in issues(spec) if i.fatal]
 
 
-def test_the_default_spec_has_no_fatal_issue_and_and_no_warning():
+def test_the_default_spec_has_no_fatal_issue_and_no_warning():
     """既定の受金のロッド通し穴は、径方向の肉が両側 3.8 で、目安（板厚の半分 = 3）を満たす（溝 14、仕様 §5.3）。警告は無い。"""
     found = issues(SPEC)
     assert fatal_count(found) == 0 and found == []
+
+
+def test_the_key_socket_check_is_part_of_issues():
+    """差し口の検査は issues() に合成されて build で効く。溝 10 の旧値と、差し口を大きくした例の両方で fatal になる（既定は空）。"""
+    assert issues(SPEC) == []
+    assert any("差し口" in w for w in _fatal(override(SPEC, hoop__gap=10, lug__standoff=10)))
+    assert any("差し口" in w for w in _fatal(override(SPEC, lug__key_socket_dia=30)))
 
 
 @pytest.mark.parametrize("label, values, fragment", [

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from gatling.checks import aligned, ear_fits, hoop_seat, key_socket_fits, lug_fits, rod_fits, spacing
+from gatling.fasteners import lookup_rod
 from gatling.params import SPEC, override
 from gatling.placement import levels, pipe_inner_radius, radii
 
@@ -262,5 +263,10 @@ def test_the_old_ten_millimetre_gap_cannot_take_the_key_socket():
 
 
 def test_the_default_ear_walls_beside_the_rod_hole_are_both_at_least_half_the_plate_thickness():
-    """既定の受金の穴の両側の肉は、板厚の半分（3 mm）以上で、警告が出ない。"""
+    """既定の受金の穴の両側の肉（内側・外側）は、板厚の半分（3 mm）以上で、警告が出ない。"""
+    r, z = radii(SPEC), levels(SPEC)
+    hole = float(lookup_rod(SPEC.lug.thread)) + float(SPEC.hoop.ear.hole_clearance)
+    inner = (r.rod - hole / 2) - r.hoop_in_outer
+    outer = min(pipe_inner_radius(SPEC, z.ear_bottom, z.ear_top), r.hoop_out_centre) - (r.rod + hole / 2)
+    assert inner == pytest.approx(3.8, abs=0.01) and outer == pytest.approx(3.815, abs=0.01)
     assert ear_fits(SPEC) == []
